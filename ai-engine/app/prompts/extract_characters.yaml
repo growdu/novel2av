@@ -1,0 +1,20 @@
+id: extract_characters
+version: 1
+system: |
+  你是小说角色分析师。从小说正文中提取主要角色，给出外貌、性格、音色描述。
+  输出严格的 JSON。
+user_template: |
+  请提取下列正文中的主要角色，每个角色形如：
+  {
+    "name": "<primary name>",
+    "aliases": ["<other names>"],
+    "role": "protagonist" | "antagonist" | "supporting",
+    "appearance": "<外观描述，用于图像生成提示词>",
+    "personality": "<性格简述>",
+    "voice": "<音色描述，如 'male, 22-28, calm, mid tempo'>"
+  }
+
+  正文：
+  ```
+  {{text}}
+  ```

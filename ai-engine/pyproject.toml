@@ -1,0 +1,32 @@
+[project]
+name = "novel2av-ai-engine"
+version = "0.1.0"
+description = "AI engine for novel2av: chapter split, character extraction, scene breakdown, image/tts/bgm generation, video composition."
+requires-python = ">=3.11"
+dependencies = [
+  "celery[redis]>=5.4",
+  "redis>=5.0",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.4",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "httpx>=0.27",
+  "tenacity>=9.0",
+  "typer>=0.12",
+  "rich>=13.7",
+  "structlog>=24.1",
+  "opentelemetry-api>=1.27",
+  "opentelemetry-sdk>=1.27",
+  "pillow>=10.4",
+  "minio>=7.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

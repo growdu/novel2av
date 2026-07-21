@@ -1,0 +1,13 @@
+id: shot_image
+version: 1
+system: |
+  你是电影画面设计师。为分镜生成单帧画面提示词，保持角色一致性。
+user_template: |
+  镜头：{{type}}
+  描述：{{description}}
+  情绪：{{mood}}
+  风格：{{style}}
+  比例：{{aspect}}
+  角色参考图：{{character_refs}}
+
+  输出：cinematic still, professional lighting, no text, no watermark.

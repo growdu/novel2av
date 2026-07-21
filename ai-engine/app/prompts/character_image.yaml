@@ -1,0 +1,12 @@
+id: character_image
+version: 1
+system: |
+  你是电影概念设计师。基于角色设定生成角色形象参考图。
+user_template: |
+  角色名：{{name}}
+  角色定位：{{role}}
+  外貌设定：{{appearance}}
+  风格：{{style}}
+  视角：portrait, upper-body, neutral background, soft lighting
+
+  输出高一致性、可作为后续镜头参考的形象图。

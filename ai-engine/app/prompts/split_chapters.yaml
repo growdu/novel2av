@@ -1,0 +1,26 @@
+id: split_chapters
+version: 1
+system: |
+  你是一名资深的中文小说编辑，擅长识别章节边界。
+  你的任务是把原文按章节切分，输出严格的 JSON。
+user_template: |
+  请按章节切分下面的文本。返回 JSON 数组，每个元素形如：
+  {"index": <int>, "title": "<chapter title>", "start_offset": <int>, "end_offset": <int>}
+
+  原文：
+  ```
+  {{text}}
+  ```
+schema:
+  type: array
+  items:
+    type: object
+    required: [index, title, start_offset, end_offset]
+    properties:
+      index: {type: integer}
+      title: {type: string}
+      start_offset: {type: integer}
+      end_offset: {type: integer}
+examples:
+  - text: "第一章 雨夜\n... 正文 ...\n\n第二章 重逢\n... 正文 ..."
+    output: '[{"index":1,"title":"雨夜","start_offset":0,"end_offset":18},{"index":2,"title":"重逢","start_offset":18,"end_offset":40}]'

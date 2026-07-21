@@ -1,0 +1,9 @@
+id: tts_voice_profile
+version: 1
+# Maps abstract voice profiles to provider-specific voice IDs.
+# Operators may override per deployment.
+profiles:
+  male_adult_calm:    {doubao: "zh_male_calm", edge: "zh-CN-YunxiNeural"}
+  female_young_warm:  {doubao: "zh_female_warm", edge: "zh-CN-XiaoxiaoNeural"}
+  male_young_tense:   {doubao: "zh_male_tense", edge: "zh-CN-YunjianNeural"}
+  narrator_default:   {doubao: "zh_male_calm", edge: "zh-CN-YunxiNeural"}

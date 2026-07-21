@@ -1,0 +1,34 @@
+id: scene_breakdown
+version: 1
+system: |
+  你是影视分镜师。把章节正文拆解为场景与镜头，每个镜头必须能用一张图+一段配音表达。
+  输出严格的 JSON。
+user_template: |
+  章节正文：
+  ```
+  {{text}}
+  ```
+
+  角色参考（用于一致性）：
+  {{characters}}
+
+  输出格式：
+  {
+    "scenes": [
+      {
+        "idx": <int>,
+        "location": "<地点>",
+        "mood": "<情绪关键词>",
+        "characters": ["<names>"],
+        "shots": [
+          {
+            "idx": <int>,
+            "type": "wide" | "medium" | "closeup",
+            "description": "<镜头画面描述>",
+            "narration": "<旁白文本>",
+            "duration_hint": <float seconds>
+          }
+        ]
+      }
+    ]
+  }
