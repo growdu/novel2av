@@ -125,3 +125,32 @@ Infra
 - `migrate up` 命令未实现（先用 `psql -f migrations/0001_init.sql`）
 - `countByStatus` 未对外暴露
 - 用户体系仍为 stub（`currentUser` 固定一个 UUID）
+
+## M2 增量 — 章节切分（已落地）
+
+### ai-engine
+- `services/chapter_service.py` — 规则切分（覆盖 `第N章/回/节/卷/集/部`、`第N篇`、`Chapter N`、`CHAPTER II`、`卷N`）+ LLM 复核；提供 `merge / split_at` 辅助。
+- `tasks/chapter_split.py` — 从 MinIO 读 `source_key` → 规则切 → 必要时回退到 LLM → 把每章写为 `projects/<id>/chapters/<n>.json` + 汇总 `results/<id>/split_chapters.json`。
+
+### backend
+- `migrations/0002_chapters_relax.sql` — `chapters.content_key` 允许 NULL（创建项目时尚无）。
+- `infra/db/repo/chapter.go` — Upsert / List / Get / Patch / DeleteByProject。
+- `service/chapter_service.go` — TriggerSplit 入队 `ai:split_chapters`；IngestSplitResult 从 MinIO 拉 manifest → upsert chapters → 标记项目 `SPLIT`。
+- `service/http_helpers.go` — `fetchURL` 共享工具。
+- `httpapi/handlers.go` — `listChapters / splitChapters / ingestChapters / patchChapter`。
+- `httpapi/router.go` — 新增 `POST /api/v1/projects/{id}/chapters:split` 与 `:ingest`；`PATCH /api/v1/chapters/{id}`。
+- `cmd/cli/main.go` — `novel2av chapter {split,ingest,list,rename}`；`novel2av migrate up` 用 `schema_migrations` 表顺序应用 `migrations/*.sql`。
+- `service/chapter_service_test.go` — 校验拒绝空标题。
+
+### frontend
+- `lib/api/client.ts` — 新增 Chapter 与相关端点类型。
+- `features/chapter/api.ts` — `useChapters / useSplitChapters / useIngestChapters / usePatchChapter / useMergeChaptersLocally`。
+- `features/chapter/ChapterListPanel.tsx` — 触发/拉取按钮 + 列表 + 简易轮询（M4 替换为 WS）。
+- `pages/ChapterListPage.tsx` — 章节列表页（容器）。
+- `pages/ChapterEditorPage.tsx` — 左列表 + 右编辑（标题即时保存 + 合并工具）。
+- `app/router.tsx` — `/projects/:id/chapters` 路由。
+
+### 待补（不在 M2）
+- LLM 调用目前使用占位模型名 `doubao-pro-128k`；运维通过 env 注入真实模型。
+- WebSocket 进度推送还未实现，前端用 4s 轮询占位。
+- 「合并」的语义在 M2 是打标 + 改首章标题；真正把 N 章正文合并为一份并重排 offset，需 M4 的章节→分镜转换时再做。

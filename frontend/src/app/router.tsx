@@ -15,7 +15,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <ProjectsPage /> },
       { path: 'projects/:id', element: <ProjectDetailPage /> },
-      { path: 'projects/:id/chapters/:n', element: <ChapterEditorPage /> },
+      { path: "projects/:id/chapters", element: <ChapterListPage /> },
+      { path: "projects/:id/chapters/:n", element: <ChapterEditorPage /> },
       { path: 'projects/:id/characters', element: <CharacterGalleryPage /> },
       { path: 'projects/:id/shots', element: <ShotListPage /> },
       { path: 'projects/:id/preview/:chapter', element: <VideoPreviewPage /> },

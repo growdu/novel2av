@@ -1,4 +1,3 @@
-// Package httpapi wires chi routes and middleware for the public API.
 package httpapi
 
 import (
@@ -11,10 +10,8 @@ import (
 	"github.com/novel2av/backend/internal/service"
 )
 
-// NewRouter returns the top-level HTTP handler. All endpoints live under /api/v1.
 func NewRouter(svcs *service.Services) http.Handler {
 	r := chi.NewRouter()
-
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
@@ -38,6 +35,7 @@ func NewRouter(svcs *service.Services) http.Handler {
 				r.Post("/pipeline:rerun", rerunPipeline(svcs))
 				r.Get("/chapters", listChapters(svcs))
 				r.Post("/chapters:split", splitChapters(svcs))
+				r.Post("/chapters:ingest", ingestChapters(svcs))
 				r.Get("/characters", listCharacters(svcs))
 				r.Post("/characters:extract", extractCharacters(svcs))
 				r.Get("/shots", listShots(svcs))
@@ -58,6 +56,5 @@ func NewRouter(svcs *service.Services) http.Handler {
 		r.Get("/assets/{id}", getAsset(svcs))
 		r.Get("/ws/projects/{id}", wsProject(svcs))
 	})
-
 	return r
 }

@@ -16,6 +16,7 @@ type Services struct {
 	Pipeline *PipelineService
 	Asset    *AssetService
 	Project  *ProjectService
+	Chapter  *ChapterService
 }
 
 func New(db *pgxpool.Pool, st *storage.MinIOClient, q *queue.AsynqClient) *Services {
@@ -27,6 +28,7 @@ func New(db *pgxpool.Pool, st *storage.MinIOClient, q *queue.AsynqClient) *Servi
 		Pipeline: NewPipelineService(db, q, hub),
 		Asset:    NewAssetService(st),
 		Project:  NewProjectService(db, st),
+		Chapter:  NewChapterService(db, st, q),
 	}
 }
 

@@ -22,7 +22,6 @@ func errResp(w http.ResponseWriter, status int, code, msg string) {
 	jsonResp(w, status, map[string]any{"error": map[string]string{"code": code, "message": msg}})
 }
 
-// mapErr maps domain sentinels to HTTP responses.
 func mapErr(w http.ResponseWriter, err error) bool {
 	if err == nil {
 		return false
@@ -42,7 +41,6 @@ func mapErr(w http.ResponseWriter, err error) bool {
 	return true
 }
 
-// currentUser returns a stub user_id for M1. Replace with JWT/session in M7+.
 func currentUser(_ *http.Request) string { return "00000000-0000-0000-0000-000000000001" }
 
 func readyz(svcs *service.Services) http.HandlerFunc {
@@ -59,7 +57,6 @@ func readyz(svcs *service.Services) http.HandlerFunc {
 
 func createProject(svcs *service.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// 32 MB in-memory cap for the multipart body.
 		if err := r.ParseMultipartForm(32 << 20); err != nil {
 			errResp(w, http.StatusBadRequest, "invalid_input", "multipart parse: "+err.Error())
 			return
@@ -134,20 +131,67 @@ func deleteProject(svcs *service.Services) http.HandlerFunc {
 	}
 }
 
-func limitOr(v, def int) int {
-	if v <= 0 {
-		return def
+// --- Chapters ---------------------------------------------------------------
+
+func listChapters(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		items, err := svcs.Chapter.List(r.Context(), projectID)
+		if mapErr(w, err) {
+			return
+		}
+		if items == nil {
+			items = []domain.Chapter{}
+		}
+		jsonResp(w, http.StatusOK, items)
 	}
-	return v
 }
 
-// --- stubs kept so the router still compiles for non-M1 endpoints -----------
+func splitChapters(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		jobID, err := svcs.Chapter.TriggerSplit(r.Context(), projectID)
+		if mapErr(w, err) {
+			return
+		}
+		jsonResp(w, http.StatusAccepted, map[string]any{"job_id": jobID, "status": "queued"})
+	}
+}
+
+func ingestChapters(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		n, err := svcs.Chapter.IngestSplitResult(r.Context(), projectID)
+		if mapErr(w, err) {
+			return
+		}
+		jsonResp(w, http.StatusOK, map[string]any{"ingested": n})
+	}
+}
+
+func patchChapter(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body struct {
+			Title  *string `json:"title"`
+			Status *string `json:"status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			errResp(w, http.StatusBadRequest, "invalid_input", err.Error())
+			return
+		}
+		c, err := svcs.Chapter.Patch(r.Context(), id, body.Title, body.Status)
+		if mapErr(w, err) {
+			return
+		}
+		jsonResp(w, http.StatusOK, c)
+	}
+}
+
+// --- Other placeholders -----------------------------------------------------
 
 func runPipeline(svcs *service.Services) http.HandlerFunc      { return notImpl }
 func rerunPipeline(svcs *service.Services) http.HandlerFunc    { return notImpl }
-func listChapters(svcs *service.Services) http.HandlerFunc     { return notImpl }
-func splitChapters(svcs *service.Services) http.HandlerFunc    { return notImpl }
-func patchChapter(svcs *service.Services) http.HandlerFunc     { return notImpl }
 func listCharacters(svcs *service.Services) http.HandlerFunc   { return notImpl }
 func extractCharacters(svcs *service.Services) http.HandlerFunc { return notImpl }
 func regenCharacterImage(svcs *service.Services) http.HandlerFunc { return notImpl }
@@ -159,12 +203,17 @@ func getJob(svcs *service.Services) http.HandlerFunc               { return notI
 func getAsset(svcs *service.Services) http.HandlerFunc             { return notImpl }
 func wsProject(svcs *service.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		projectID := chi.URLParam(r, "id")
-		_ = projectID
 		errResp(w, http.StatusNotImplemented, "not_implemented", "websocket handler pending")
 	}
 }
 
 func notImpl(w http.ResponseWriter, _ *http.Request) {
 	errResp(w, http.StatusNotImplemented, "not_implemented", "handler pending")
+}
+
+func limitOr(v, def int) int {
+	if v <= 0 {
+		return def
+	}
+	return v
 }

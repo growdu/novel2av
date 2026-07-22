@@ -34,7 +34,7 @@ export function ProjectDetailPage() {
         <div className="mt-4 flex gap-3 text-sm">
           <Link className="text-slate-700 hover:underline" to={`/projects/${p.id}/characters`}>角色</Link>
           <Link className="text-slate-700 hover:underline" to={`/projects/${p.id}/shots`}>分镜</Link>
-          <Link className="text-slate-700 hover:underline" to={`/projects/${p.id}/chapters/1`}>章节</Link>
+          <Link className="text-slate-700 hover:underline" to={`/projects/${p.id}/chapters`}>章节</Link>
         </div>
       </div>
     </div>
