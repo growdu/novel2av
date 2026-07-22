@@ -41,7 +41,6 @@ func (s *ChapterService) Get(ctx context.Context, id string) (domain.Chapter, er
 	return s.chapters.Get(ctx, id)
 }
 
-// Patch supports rename and manual status update.
 func (s *ChapterService) Patch(ctx context.Context, id string, title *string, status *string) (domain.Chapter, error) {
 	if title != nil && *title == "" {
 		return domain.Chapter{}, fmt.Errorf("%w: title cannot be empty", domain.ErrInvalidInput)
@@ -49,7 +48,6 @@ func (s *ChapterService) Patch(ctx context.Context, id string, title *string, st
 	return s.chapters.Patch(ctx, id, title, status)
 }
 
-// TriggerSplit enqueues `ai:split_chapters` for a project.
 func (s *ChapterService) TriggerSplit(ctx context.Context, projectID string) (string, error) {
 	p, err := s.projects.Get(ctx, projectID)
 	if err != nil {
@@ -62,12 +60,7 @@ func (s *ChapterService) TriggerSplit(ctx context.Context, projectID string) (st
 	return s.queue.Enqueue(ctx, "ai:split_chapters", body, 3)
 }
 
-// IngestSplitResult is called after the ai-engine worker finishes. It downloads
-// the JSON manifest and upserts every chapter row.
-//
-// In production this is invoked by a callback worker that listens on
-// Redis channel `events:job:<job_id>`; for now it can be triggered by CLI
-// (`novel2av chapter ingest <project_id>`) for easy testing.
+// IngestSplitResult reads the split manifest from MinIO and upserts every chapter.
 func (s *ChapterService) IngestSplitResult(ctx context.Context, projectID string) (int, error) {
 	key := fmt.Sprintf("results/%s/split_chapters.json", projectID)
 	body, err := s.downloadResult(ctx, key)
@@ -86,19 +79,20 @@ func (s *ChapterService) IngestSplitResult(ctx context.Context, projectID string
 	if err := json.Unmarshal(body, &manifest); err != nil {
 		return 0, fmt.Errorf("parse manifest: %w", err)
 	}
-	// Stable order by index.
 	sort.Slice(manifest.Chapters, func(i, j int) bool {
 		return manifest.Chapters[i].Index < manifest.Chapters[j].Index
 	})
 
 	count := 0
 	for _, ch := range manifest.Chapters {
+		// Try to read the chapter's own JSON for word_count; fall back to 0.
+		words := readWordCount(ctx, s, ch.Key)
 		_, err := s.chapters.Upsert(ctx, domain.Chapter{
 			ProjectID:  projectID,
 			Index:      ch.Index,
 			Title:      ch.Title,
 			ContentKey: ch.Key,
-			WordCount:  0, // populated on demand; ai-engine already wrote content in the JSON
+			WordCount:  words,
 			Status:     "READY",
 		})
 		if err != nil {
@@ -107,7 +101,6 @@ func (s *ChapterService) IngestSplitResult(ctx context.Context, projectID string
 		count++
 	}
 
-	// Update project status.
 	if _, err := s.db.Exec(ctx,
 		`UPDATE projects SET status = $2, updated_at = $3 WHERE id = $1`,
 		projectID, domain.ProjectSplit, time.Now().UTC()); err != nil {
@@ -116,7 +109,24 @@ func (s *ChapterService) IngestSplitResult(ctx context.Context, projectID string
 	return count, nil
 }
 
-// --- helpers ---------------------------------------------------------------
+func readWordCount(ctx context.Context, s *ChapterService, key string) int {
+	if key == "" {
+		return 0
+	}
+	url, err := s.storage.PresignGet(ctx, key, 5*time.Minute)
+	if err != nil {
+		return 0
+	}
+	body, err := fetchURL(ctx, url.String())
+	if err != nil {
+		return 0
+	}
+	var ch struct {
+		WordCount int `json:"word_count"`
+	}
+	_ = json.Unmarshal(body, &ch)
+	return ch.WordCount
+}
 
 func (s *ChapterService) downloadResult(ctx context.Context, key string) ([]byte, error) {
 	url, err := s.storage.PresignGet(ctx, key, 5*time.Minute)

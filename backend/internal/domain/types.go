@@ -1,5 +1,3 @@
-// Package domain holds plain entities + business rules. No external imports
-// outside stdlib — these types must be cheap to construct in tests.
 package domain
 
 import "time"
@@ -7,31 +5,31 @@ import "time"
 type ProjectStatus string
 
 const (
-	ProjectCreated   ProjectStatus = "CREATED"
-	ProjectSplitting ProjectStatus = "SPLITTING"
-	ProjectSplit     ProjectStatus = "SPLIT"
+	ProjectCreated    ProjectStatus = "CREATED"
+	ProjectSplitting  ProjectStatus = "SPLITTING"
+	ProjectSplit      ProjectStatus = "SPLIT"
 	ProjectExtracting ProjectStatus = "EXTRACTING"
-	ProjectReady     ProjectStatus = "READY"
-	ProjectRunning   ProjectStatus = "RUNNING"
-	ProjectDone      ProjectStatus = "DONE"
-	ProjectFailed    ProjectStatus = "FAILED"
+	ProjectReady      ProjectStatus = "READY"
+	ProjectRunning    ProjectStatus = "RUNNING"
+	ProjectDone       ProjectStatus = "DONE"
+	ProjectFailed     ProjectStatus = "FAILED"
 )
 
 type Project struct {
-	ID         string        `json:"id"`
-	UserID     string        `json:"user_id"`
-	Title      string        `json:"title"`
-	Author     string        `json:"author"`
-	SourceKey  string        `json:"source_key"`
-	Status     ProjectStatus `json:"status"`
-	WordCount  int           `json:"word_count"`
-	Config     ProjectConfig `json:"config"`
-	CreatedAt  time.Time     `json:"created_at"`
-	UpdatedAt  time.Time     `json:"updated_at"`
+	ID        string        `json:"id"`
+	UserID    string        `json:"user_id"`
+	Title     string        `json:"title"`
+	Author    string        `json:"author"`
+	SourceKey string        `json:"source_key"`
+	Status    ProjectStatus `json:"status"`
+	WordCount int           `json:"word_count"`
+	Config    ProjectConfig `json:"config"`
+	CreatedAt time.Time     `json:"created_at"`
+	UpdatedAt time.Time     `json:"updated_at"`
 }
 
 type ProjectConfig struct {
-	Aspect string `json:"aspect"` // "9:16" | "16:9"
+	Aspect string `json:"aspect"`
 	Style  string `json:"style"`
 	Voice  string `json:"voice"`
 }
@@ -42,21 +40,34 @@ type Chapter struct {
 	Index     int       `json:"index"`
 	Title     string    `json:"title"`
 	WordCount int       `json:"word_count"`
-	Status    string    `json:"status"`
+	Status     string    `json:"status"`
+	ContentKey string    `json:"content_key"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 type Character struct {
-	ID          string    `json:"id"`
-	ProjectID   string    `json:"project_id"`
-	Name        string    `json:"name"`
-	Aliases     []string  `json:"aliases"`
-	Role        string    `json:"role"`
-	Appearance  string    `json:"appearance"`
-	Personality string    `json:"personality"`
-	Voice       string    `json:"voice"`
-	RefImageKey string    `json:"ref_image_key"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           string         `json:"id"`
+	ProjectID    string         `json:"project_id"`
+	Name         string         `json:"name"`
+	Aliases      []string       `json:"aliases"`
+	Role         string         `json:"role"`
+	Appearance   string         `json:"appearance"`
+	Personality  string         `json:"personality"`
+	Voice        string         `json:"voice"`
+	RefImageKey  string         `json:"ref_image_key"`
+	Meta         map[string]any `json:"meta"`
+	CreatedAt    time.Time      `json:"created_at"`
+}
+
+// CharacterPatch captures any subset of editable character fields.
+type CharacterPatch struct {
+	Name         *string  `json:"name,omitempty"`
+	Aliases      *[]string `json:"aliases,omitempty"`
+	Role         *string  `json:"role,omitempty"`
+	Appearance   *string  `json:"appearance,omitempty"`
+	Personality  *string  `json:"personality,omitempty"`
+	Voice        *string  `json:"voice,omitempty"`
+	RefImageKey  *string  `json:"ref_image_key,omitempty"`
 }
 
 type Shot struct {
@@ -80,11 +91,11 @@ type Shot struct {
 type JobStatus string
 
 const (
-	JobQueued    JobStatus = "queued"
-	JobRunning   JobStatus = "running"
-	JobSuccess   JobStatus = "success"
-	JobFailed    JobStatus = "failed"
-	JobRetrying  JobStatus = "retrying"
+	JobQueued   JobStatus = "queued"
+	JobRunning  JobStatus = "running"
+	JobSuccess  JobStatus = "success"
+	JobFailed   JobStatus = "failed"
+	JobRetrying JobStatus = "retrying"
 )
 
 type Job struct {
@@ -99,10 +110,10 @@ type Job struct {
 }
 
 type JobMeta struct {
-	Step        string `json:"step,omitempty"`
-	Current     int    `json:"current"`
-	Total       int    `json:"total"`
+	Step        string  `json:"step,omitempty"`
+	Current     int     `json:"current"`
+	Total       int     `json:"total"`
 	CostEstUSD  float64 `json:"cost_est_usd"`
 	CostActual  float64 `json:"cost_actual_usd"`
-	LastMessage string `json:"last_message,omitempty"`
+	LastMessage string  `json:"last_message,omitempty"`
 }

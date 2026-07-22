@@ -154,3 +154,37 @@ Infra
 - LLM 调用目前使用占位模型名 `doubao-pro-128k`；运维通过 env 注入真实模型。
 - WebSocket 进度推送还未实现，前端用 4s 轮询占位。
 - 「合并」的语义在 M2 是打标 + 改首章标题；真正把 N 章正文合并为一份并重排 offset，需 M4 的章节→分镜转换时再做。
+
+## M3 增量 — 角色提取 + 形象图（已落地）
+
+### ai-engine
+- `services/character_service.py` — LLM 抽取（OpenAI 兼容 gateway）+ Pydantic 校验 + 去重；`merge_into_manifest` 工具。
+- `infra/media/image_provider.py` — 抽象 `generate_image`，默认 Seedream（OpenAI 兼容 images/generations），未配置时回退到带 provider 元数据的占位 PNG。
+- `tasks/character_extract.py` — 从 MinIO 读每章 JSON → LLM 抽取 → 上传 `results/<id>/characters.json`。
+- `tasks/character_image.py` — 读 character profile → 构造 prompt → 生成 N 张变体 → 上传 `characters/<id>/<cid>/variants/vN.png` + `ref_image.png`（如已存在旧 ref，自动作为 reference_images 传给 provider 保持一致性）。
+
+### backend
+- `infra/db/repo/character.go` — UpsertByName / ListByProject / Get / SetRefImage / Patch / Delete。
+- `domain/types.go` — `CharacterPatch`、`Chapter.ContentKey` 暴露。
+- `infra/db/repo/chapter.go` — List/Get/Patch 都返回 `content_key`。
+- `service/character_service.go` — TriggerExtract（用 `Chapter.ContentKey` 作为 ai-engine 的 chapter_keys）+ TriggerRegenImage + IngestExtractResult（upsert + 项目状态置 `READY`）+ IngestCharacterImage（写回 ref_image_key）。
+- `service/chapter_service.go` — IngestSplitResult 现在读取每个 chapter JSON 的 `word_count`。
+- `service/asset_service.go` — 新增 `URL(key, ttl)` 字符串便捷方法。
+- `service/services.go` — 接入 `CharacterService`。
+- `httpapi/handlers.go` — `listCharacters / extractCharacters / ingestCharacters / getCharacter / patchCharacter / deleteCharacter / regenCharacterImage / ingestCharacterImage`；列表与详情都自动附加签名 URL。
+- `httpapi/router.go` — 新增 `/characters/{id}` GET/PATCH/DELETE 与 `/image:regen` `/image:ingest`；`/projects/{id}/characters:ingest`。
+- `cmd/cli/main.go` — `character {extract,ingest,list,show,regen}` 子命令。
+- `service/character_service_test.go` — 校验拒绝空名字。
+
+### frontend
+- `lib/api/client.ts` — `Character / CharacterRole / CharacterPatch` 类型 + endpoint schema。
+- `features/character/api.ts` — `useCharacters / useCharacter / useExtractCharacters / useIngestCharacters / useRegenImage / usePatchCharacter`；角色标签 + 配色。
+- `features/character/CharacterGalleryPanel.tsx` — 触发/拉取 + 4s 轮询占位（M4 改 WS）；卡片网格（缩略图 + 名字 + 角色色标 + 一行简介）。
+- `pages/CharacterGalleryPage.tsx` — 画廊容器。
+- `pages/CharacterDetailPage.tsx` — 形象图大图 + 重新生成按钮 + 名字/外貌/音色的即时保存。
+- `app/router.tsx` — `/projects/:id/characters/:cid` 路由。
+
+### 待补（不在 M3）
+- WebSocket 进度推送（M4 接）。
+- 真正把旧 ref_image 作为 image_reference 喂给 Seedream，需要 ai-engine 端 vendor 接口支持（OpenAI 兼容协议里通常叫 `image` 或 `image_reference`，不同 provider 字段名不一；本骨架先做 capability detection）。
+- 角色 LoRA（v1.x）。

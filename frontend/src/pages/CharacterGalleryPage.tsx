@@ -1,8 +1,13 @@
+import { useParams } from 'react-router-dom';
+import { CharacterGalleryPanel } from '../features/character/CharacterGalleryPanel';
+
 export function CharacterGalleryPage() {
+  const { id } = useParams();
+  if (!id) return null;
   return (
-    <div className="text-slate-500">
-      <h2 className="text-xl font-semibold mb-2">CharacterGalleryPage</h2>
-      <p>将在后续里程碑实现。当前仅占位。</p>
+    <div className="space-y-3">
+      <h2 className="text-xl font-semibold">角色</h2>
+      <CharacterGalleryPanel projectId={id} />
     </div>
   );
 }

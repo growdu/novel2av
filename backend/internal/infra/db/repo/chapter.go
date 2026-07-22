@@ -15,7 +15,7 @@ type ChapterRepo struct{ db *pgxpool.Pool }
 
 func NewChapterRepo(db *pgxpool.Pool) *ChapterRepo { return &ChapterRepo{db: db} }
 
-// Upsert inserts a chapter row or updates title/word_count if it already exists.
+// Upsert inserts a chapter row or updates title/word_count/content_key if it already exists.
 func (r *ChapterRepo) Upsert(ctx context.Context, c domain.Chapter) (domain.Chapter, error) {
 	row := r.db.QueryRow(ctx, `
 		INSERT INTO chapters (project_id, "index", title, content_key, word_count, status)
@@ -36,7 +36,7 @@ func (r *ChapterRepo) Upsert(ctx context.Context, c domain.Chapter) (domain.Chap
 
 func (r *ChapterRepo) ListByProject(ctx context.Context, projectID string) ([]domain.Chapter, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, project_id, "index", title, word_count, status, created_at
+		SELECT id, project_id, "index", title, word_count, status, content_key, created_at
 		FROM chapters WHERE project_id = $1 ORDER BY "index" ASC`, projectID)
 	if err != nil {
 		return nil, err
@@ -44,9 +44,8 @@ func (r *ChapterRepo) ListByProject(ctx context.Context, projectID string) ([]do
 	defer rows.Close()
 	var out []domain.Chapter
 	for rows.Next() {
-		var c domain.Chapter
-		if err := rows.Scan(&c.ID, &c.ProjectID, &c.Index, &c.Title,
-			&c.WordCount, &c.Status, &c.CreatedAt); err != nil {
+		c, err := scanChapter(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, c)
@@ -56,7 +55,7 @@ func (r *ChapterRepo) ListByProject(ctx context.Context, projectID string) ([]do
 
 func (r *ChapterRepo) Get(ctx context.Context, id string) (domain.Chapter, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, project_id, "index", title, word_count, status, created_at
+		SELECT id, project_id, "index", title, word_count, status, content_key, created_at
 		FROM chapters WHERE id = $1`, id)
 	return scanChapter(row)
 }
@@ -79,7 +78,7 @@ func (r *ChapterRepo) Patch(ctx context.Context, id string, title *string, statu
 		return r.Get(ctx, id)
 	}
 	q := "UPDATE chapters SET " + strings.Join(sets, ", ") + " WHERE id = $1 " +
-		`RETURNING id, project_id, "index", title, word_count, status, created_at`
+		`RETURNING id, project_id, "index", title, word_count, status, content_key, created_at`
 	row := r.db.QueryRow(ctx, q, args...)
 	return scanChapter(row)
 }
@@ -91,14 +90,12 @@ func (r *ChapterRepo) DeleteByProject(ctx context.Context, projectID string) err
 
 func scanChapter(s scanner) (domain.Chapter, error) {
 	var c domain.Chapter
-	err := s.Scan(&c.ID, &c.ProjectID, &c.Index, &c.Title, &c.WordCount, &c.Status, &c.CreatedAt)
+	err := s.Scan(&c.ID, &c.ProjectID, &c.Index, &c.Title, &c.WordCount, &c.Status, &c.ContentKey, &c.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Chapter{}, domain.ErrNotFound
 	}
 	return c, err
 }
-
-// --- number helper ----------------------------------------------------------
 
 func itoa(n int) string {
 	if n == 0 {

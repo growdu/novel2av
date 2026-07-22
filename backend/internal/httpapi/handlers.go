@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -192,9 +193,135 @@ func patchChapter(svcs *service.Services) http.HandlerFunc {
 
 func runPipeline(svcs *service.Services) http.HandlerFunc      { return notImpl }
 func rerunPipeline(svcs *service.Services) http.HandlerFunc    { return notImpl }
-func listCharacters(svcs *service.Services) http.HandlerFunc   { return notImpl }
-func extractCharacters(svcs *service.Services) http.HandlerFunc { return notImpl }
-func regenCharacterImage(svcs *service.Services) http.HandlerFunc { return notImpl }
+// --- Characters -------------------------------------------------------------
+
+func listCharacters(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		items, err := svcs.Character.List(r.Context(), projectID)
+		if mapErr(w, err) {
+			return
+		}
+		if items == nil {
+			items = []domain.Character{}
+		}
+		// Decorate with ref_image_url (signed).
+		ttl := 15 * time.Minute
+		for i := range items {
+			if items[i].RefImageKey == "" {
+				continue
+			}
+			u, err := svcs.Asset.URL(r.Context(), items[i].RefImageKey, ttl)
+			if err == nil {
+				items[i].Meta = map[string]any{"ref_image_url": u.String()}
+			}
+		}
+		jsonResp(w, http.StatusOK, items)
+	}
+}
+
+func extractCharacters(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		jobID, err := svcs.Character.TriggerExtract(r.Context(), projectID)
+		if mapErr(w, err) {
+			return
+		}
+		jsonResp(w, http.StatusAccepted, map[string]any{"job_id": jobID, "status": "queued"})
+	}
+}
+
+func ingestCharacters(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		n, err := svcs.Character.IngestExtractResult(r.Context(), projectID)
+		if mapErr(w, err) {
+			return
+		}
+		jsonResp(w, http.StatusOK, map[string]any{"ingested": n})
+	}
+}
+
+func getCharacter(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		c, err := svcs.Character.Get(r.Context(), id)
+		if mapErr(w, err) {
+			return
+		}
+		if c.RefImageKey != "" {
+			if u, err := svcs.Asset.URL(r.Context(), c.RefImageKey, 30*time.Minute); err == nil {
+				c.Meta = map[string]any{"ref_image_url": u.String()}
+			}
+		}
+		jsonResp(w, http.StatusOK, c)
+	}
+}
+
+func patchCharacter(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body domain.CharacterPatch
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			errResp(w, http.StatusBadRequest, "invalid_input", err.Error())
+			return
+		}
+		c, err := svcs.Character.Patch(r.Context(), id, body)
+		if mapErr(w, err) {
+			return
+		}
+		jsonResp(w, http.StatusOK, c)
+	}
+}
+
+func regenCharacterImage(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body struct {
+			Variants int `json:"variants"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		jobID, err := svcs.Character.TriggerRegenImage(r.Context(), id, body.Variants)
+		if mapErr(w, err) {
+			return
+		}
+		jsonResp(w, http.StatusAccepted, map[string]any{"job_id": jobID, "status": "queued"})
+	}
+}
+
+func ingestCharacterImage(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body struct {
+			RefImageKey string `json:"ref_image_key"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			errResp(w, http.StatusBadRequest, "invalid_input", err.Error())
+			return
+		}
+		if body.RefImageKey == "" {
+			errResp(w, http.StatusBadRequest, "invalid_input", "ref_image_key required")
+			return
+		}
+		if mapErr(w, svcs.Character.IngestCharacterImage(r.Context(), id, body.RefImageKey)) {
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func deleteCharacter(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		if mapErr(w, svcs.Character.Delete(r.Context(), id)) {
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// --- placeholders for the remaining surfaces ------------------------------
+
 func listShots(svcs *service.Services) http.HandlerFunc           { return notImpl }
 func regenShotImage(svcs *service.Services) http.HandlerFunc      { return notImpl }
 func regenShotTTS(svcs *service.Services) http.HandlerFunc        { return notImpl }

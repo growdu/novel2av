@@ -219,7 +219,92 @@ func chapterRenameCmd() *cobra.Command {
 // --- placeholders / migrate -------------------------------------------------
 
 func pipelineCmd() *cobra.Command  { return &cobra.Command{Use: "pipeline", Short: "trigger / inspect pipelines"} }
-func characterCmd() *cobra.Command { return &cobra.Command{Use: "character", Short: "character operations"} }
+func characterCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "character", Short: "character operations"}
+	cmd.AddCommand(characterExtractCmd(), characterIngestCmd(), characterListCmd(), characterRegenCmd(), characterShowCmd())
+	return cmd
+}
+
+func characterExtractCmd() *cobra.Command {
+	return &cobra.Command{
+		Use: "extract <project_id>", Short: "enqueue ai:extract_characters", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+			defer cancel()
+			svcs, cleanup, err := withServices(ctx)
+			if err != nil { return err }
+			defer cleanup()
+			jobID, err := svcs.Character.TriggerExtract(ctx, args[0])
+			if err != nil { return err }
+			fmt.Fprintln(os.Stdout, "queued", jobID)
+			return nil
+		}}
+}
+
+func characterIngestCmd() *cobra.Command {
+	return &cobra.Command{
+		Use: "ingest <project_id>", Short: "pull characters.json from MinIO and upsert rows", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, cancel := context.WithTimeout(cmd.Context(), 60*time.Second)
+			defer cancel()
+			svcs, cleanup, err := withServices(ctx)
+			if err != nil { return err }
+			defer cleanup()
+			n, err := svcs.Character.IngestExtractResult(ctx, args[0])
+			if err != nil { return err }
+			fmt.Fprintln(os.Stdout, "ingested", n)
+			return nil
+		}}
+}
+
+func characterListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use: "list <project_id>", Short: "list characters", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+			defer cancel()
+			svcs, cleanup, err := withServices(ctx)
+			if err != nil { return err }
+			defer cleanup()
+			items, err := svcs.Character.List(ctx, args[0])
+			if err != nil { return err }
+			return json.NewEncoder(os.Stdout).Encode(items)
+		}}
+}
+
+func characterShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use: "show <character_id>", Short: "show character", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
+			defer cancel()
+			svcs, cleanup, err := withServices(ctx)
+			if err != nil { return err }
+			defer cleanup()
+			c, err := svcs.Character.Get(ctx, args[0])
+			if err != nil { return err }
+			return json.NewEncoder(os.Stdout).Encode(c)
+		}}
+}
+
+func characterRegenCmd() *cobra.Command {
+	var variants int
+	c := &cobra.Command{
+		Use: "regen <character_id>", Short: "enqueue ai:character_image", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+			defer cancel()
+			svcs, cleanup, err := withServices(ctx)
+			if err != nil { return err }
+			defer cleanup()
+			jobID, err := svcs.Character.TriggerRegenImage(ctx, args[0], variants)
+			if err != nil { return err }
+			fmt.Fprintln(os.Stdout, "queued", jobID)
+			return nil
+		}}
+	c.Flags().IntVar(&variants, "variants", 4, "variant count")
+	return c
+}
 func mediaCmd() *cobra.Command     { return &cobra.Command{Use: "media", Short: "media utilities"} }
 func devCmd() *cobra.Command      { return &cobra.Command{Use: "dev", Short: "developer helpers"} }
 

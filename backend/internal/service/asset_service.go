@@ -20,3 +20,12 @@ func NewAssetService(st *storage.MinIOClient) *AssetService {
 func (s *AssetService) SignedURL(ctx context.Context, key string, ttl time.Duration) (*url.URL, error) {
 	return s.storage.PresignGet(ctx, key, ttl)
 }
+
+// URL is the string-returning convenience wrapper.
+func (s *AssetService) URL(ctx context.Context, key string, ttl time.Duration) (string, error) {
+	u, err := s.storage.PresignGet(ctx, key, ttl)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
