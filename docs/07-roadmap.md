@@ -105,3 +105,23 @@ Infra
 - 前端 / 后端各 1 主导 + 1 共担（AI 流水线、模型调优）。
 - 每周 demo：跑通 1 本新小说 → 生成 1 段 30s 成片。
 - 公共契约改动走 RFC 流程（更新 `06-data-model.md`）。
+
+## M1 增量 — 项目管理（已落地）
+
+### 后端
+- `infra/db/repo/project.go` — Postgres 仓储（Create / Get / List / Delete / CountByStatus / Touch）
+- `internal/service/project_service.go` — 上传到 MinIO（`novels/<id>/source.txt|.md`），20MB 硬上限，仅 .txt/.md
+- `internal/httpapi/handlers.go` — `createProject / listProjects / getProject / deleteProject`
+- `internal/infra/storage/minio.go` — 新增 `PutObject` 与 `RemovePrefix`
+- `cmd/cli/main.go` — `novel2av project {list,show,delete}`
+
+### 前端
+- `features/project/api.ts` — `useProjects / useProject / useCreateProject / useDeleteProject`
+- `features/project/NewProjectDialog.tsx` — 上传弹窗（书名/作者/文件/比例/风格）
+- `pages/ProjectsPage.tsx` — 列表 + 删除确认
+- `pages/ProjectDetailPage.tsx` — 项目详情（M1 只读，含步骤占位）
+
+### 待补（不在 M1）
+- `migrate up` 命令未实现（先用 `psql -f migrations/0001_init.sql`）
+- `countByStatus` 未对外暴露
+- 用户体系仍为 stub（`currentUser` 固定一个 UUID）
