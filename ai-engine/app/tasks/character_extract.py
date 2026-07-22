@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 def extract_characters_task(self, payload: dict) -> dict:
     parsed = ExtractCharactersPayload.model_validate(payload)
     log.info("extract_characters start", extra={"project_id": parsed.project_id})
-    report_progress(self.request.id, "running", 0, 4, "fetching chapters")
+    report_progress(self.request.id, "running", 0, 4, "fetching chapters", project_id=parsed.project_id)
 
     texts: list[str] = []
     for key in parsed.chapter_keys:
@@ -34,18 +34,18 @@ def extract_characters_task(self, payload: dict) -> dict:
         except Exception as exc:
             log.warning("chapter fetch failed", extra={"key": key, "err": str(exc)})
 
-    report_progress(self.request.id, "running", 1, 4, "calling LLM")
+    report_progress(self.request.id, "running", 1, 4, "calling LLM", project_id=parsed.project_id)
     profiles = llm_extract_sync(texts)
     log.info("extracted", extra={"count": len(profiles)})
 
-    report_progress(self.request.id, "running", 2, 4, "uploading manifest")
+    report_progress(self.request.id, "running", 2, 4, "uploading manifest", project_id=parsed.project_id)
     manifest = {
         "characters": [p.model_dump() for p in profiles],
     }
     result_key = f"results/{parsed.project_id}/characters.json"
     _upload(result_key, json.dumps(manifest, ensure_ascii=False).encode("utf-8"))
 
-    report_progress(self.request.id, "success", 4, 4, "done")
+    report_progress(self.request.id, "success", 4, 4, "done", project_id=parsed.project_id)
     return {"status": "ok", "project_id": parsed.project_id,
             "character_count": len(profiles), "result_key": result_key}
 

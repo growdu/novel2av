@@ -21,13 +21,13 @@ def character_image(self, payload: dict) -> dict:
     parsed = CharacterImagePayload.model_validate(payload)
     log.info("character_image start",
              extra={"project_id": parsed.project_id, "cid": parsed.character_id})
-    report_progress(self.request.id, "running", 0, parsed.variants, "preparing prompt")
+    report_progress(self.request.id, "running", 0, parsed.variants, "preparing prompt", project_id=parsed.project_id)
 
     name, appearance, style = _load_character(parsed.project_id, parsed.character_id)
     prompt = _build_prompt(name, appearance, style)
 
     refs: list[bytes] = _maybe_load_refs(parsed.project_id, parsed.character_id)
-    report_progress(self.request.id, "running", 1, parsed.variants, "generating")
+    report_progress(self.request.id, "running", 1, parsed.variants, "generating", project_id=parsed.project_id)
 
     variants = generate_variants_sync(prompt, n=parsed.variants, reference_images=refs)
 
@@ -43,7 +43,7 @@ def character_image(self, payload: dict) -> dict:
         ref_key = f"characters/{parsed.project_id}/{parsed.character_id}/ref_image.png"
         _upload(ref_key, variants[0], "image/png")
 
-    report_progress(self.request.id, "success", parsed.variants, parsed.variants, "done")
+    report_progress(self.request.id, "success", parsed.variants, parsed.variants, "done", project_id=parsed.project_id)
     return {"status": "ok", "character_id": parsed.character_id,
             "ref_image_key": f"characters/{parsed.project_id}/{parsed.character_id}/ref_image.png",
             "variants": keys}

@@ -24,6 +24,15 @@ export interface Character {
   ref_image_key: string; meta: { ref_image_url?: string } | null; created_at: string;
 }
 
+export interface Shot {
+  id: string; chapter_id: string; scene_idx: number; shot_idx: number;
+  type: string; description: string; narration: string; mood: string;
+  duration_sec: number; status: string;
+  image_key: string; tts_key: string; bgm_key: string; subtitle_key: string;
+  meta: { image_url?: string; tts_url?: string; bgm_url?: string } | null;
+  created_at: string;
+}
+
 export interface ListResponse<T> { items: T[]; limit: number; offset: number; }
 
 export const api = openapiFetch<{
@@ -60,6 +69,28 @@ export const api = openapiFetch<{
     POST: {
       requestBody?: { content?: { 'application/json': { ref_image_key: string } } };
       responses: { 204: unknown };
+    };
+  };
+  '/projects/{id}/shots': { GET: { responses: { 200: Shot[] } } };
+  '/projects/{id}/shots:breakdown': { POST: { responses: { 202: { job_ids: string[]; status: string } } } };
+  '/projects/{id}/shots:breakdown:ingest': {
+    POST: {
+      requestBody?: { content?: { 'application/json': { chapter_id: string } } };
+      responses: { 200: { ingested: number } };
+    };
+  };
+  '/shots/{id}': { GET: { responses: { 200: Shot } } };
+  '/shots/{id}/image:regen': {
+    POST: { requestBody?: { content?: { 'application/json': { aspect?: string } } };
+            responses: { 202: { job_id: string; status: string } } };
+  };
+  '/shots/{id}/tts:regen': {
+    POST: { responses: { 202: { job_id: string; status: string } } };
+  };
+  '/shots/{id}/assets:ingest': {
+    POST: {
+      requestBody?: { content?: { 'application/json': { image_key?: string; tts_key?: string; bgm_key?: string; subtitle_key?: string } } };
+      responses: { 200: Shot };
     };
   };
 }>({ baseUrl: '/api/v1' });

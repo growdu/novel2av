@@ -40,6 +40,8 @@ func NewRouter(svcs *service.Services) http.Handler {
 				r.Post("/characters:extract", extractCharacters(svcs))
 				r.Post("/characters:ingest", ingestCharacters(svcs))
 				r.Get("/shots", listShots(svcs))
+				r.Post("/shots:breakdown", triggerBreakdown(svcs))
+				r.Post("/shots:breakdown:ingest", ingestBreakdown(svcs))
 			})
 		})
 		r.Route("/chapters/{id}", func(r chi.Router) {
@@ -54,8 +56,10 @@ func NewRouter(svcs *service.Services) http.Handler {
 			r.Post("/image:ingest", ingestCharacterImage(svcs))
 		})
 		r.Route("/shots/{id}", func(r chi.Router) {
+			r.Get("/", getShot(svcs))
 			r.Post("/image:regen", regenShotImage(svcs))
 			r.Post("/tts:regen", regenShotTTS(svcs))
+			r.Post("/assets:ingest", ingestShotAssets(svcs))
 		})
 		r.Get("/jobs/{id}", getJob(svcs))
 		r.Get("/assets/{id}", getAsset(svcs))

@@ -85,6 +85,7 @@ type Shot struct {
 	TTSKey      string    `json:"tts_key"`
 	BGMKey      string    `json:"bgm_key"`
 	SubtitleKey string    `json:"subtitle_key"`
+	Meta        map[string]any `json:"meta"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 

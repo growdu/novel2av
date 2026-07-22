@@ -51,13 +51,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	qc, err := queue.NewAsynqClient(cfg.RedisAIURL, cfg.RedisURL)
+	qc, bus, err := queue.NewAsynqClient(cfg.RedisAIURL, cfg.RedisURL)
 	if err != nil {
 		slog.Error("queue connect", "err", err)
 		os.Exit(1)
 	}
+	defer bus.Close()
 
-	svcs := service.New(pool, mc, qc)
+	svcs := service.New(pool, mc, qc, bus)
 	router := httpapi.NewRouter(svcs)
 
 	srv := &http.Server{

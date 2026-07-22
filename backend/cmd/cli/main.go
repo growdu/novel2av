@@ -45,12 +45,12 @@ func withServices(ctx context.Context) (*service.Services, func(), error) {
 		pool.Close()
 		return nil, nil, fmt.Errorf("minio: %w", err)
 	}
-	q, err := queue.NewAsynqClient(cfg.RedisAIURL, cfg.RedisURL)
+	q, bus, err := queue.NewAsynqClient(cfg.RedisAIURL, cfg.RedisURL)
 	if err != nil {
 		pool.Close()
 		return nil, nil, fmt.Errorf("queue: %w", err)
 	}
-	return service.New(pool, sto, q), func() { pool.Close() }, nil
+	return service.New(pool, sto, q, bus), func() { pool.Close(); bus.Close() }, nil
 }
 
 // --- project ----------------------------------------------------------------

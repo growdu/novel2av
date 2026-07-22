@@ -188,3 +188,38 @@ Infra
 - WebSocket 进度推送（M4 接）。
 - 真正把旧 ref_image 作为 image_reference 喂给 Seedream，需要 ai-engine 端 vendor 接口支持（OpenAI 兼容协议里通常叫 `image` 或 `image_reference`，不同 provider 字段名不一；本骨架先做 capability detection）。
 - 角色 LoRA（v1.x）。
+
+## M4 增量 — 分镜 + 镜头图 + 配音（已落地）
+
+### ai-engine
+- `services/shot_service.py` — LLM 拆分 scenes/shots；按 narration 长度自动校准 duration；最多 64 镜/章。
+- `infra/media/tts_provider.py` — 抽象 `synthesize_speech`（默认 Doubao TTS OpenAI 兼容 endpoint），未配置时返回按 narration 长度生成的静音 WAV；`voice_for(profile)` 从 prompt YAML 解析 voice id。
+- `tasks/scene_breakdown.py` — 读 chapter JSON → LLM → 写 `results/<project_id>/chapters/<chapter_id>/breakdown.json`。
+- `tasks/generate_shot.py` — 并行 image + tts + bgm；上传到 `shots/<project_id>/<chapter_id>/<shot_id>/{image,tts,bgm,summary}`；image 自动套 `9:16` 默认尺寸。
+- `infra/queue/progress.py` — 升级：所有 `report_progress` 调用支持 `project_id` kwarg，并把事件 publish 到 Redis 通道 `events:project:<id>`。
+- 所有 5 个 pipeline task 的 progress 调用都补了 `project_id`。
+
+### backend
+- `infra/db/repo/shot.go` — Upsert / ListByProject / Get / PatchAssets（image/tts/bgm/subtitle 任一子集）；`scanShot` 解 meta。
+- `domain/types.go` — `Shot.Meta` 暴露。
+- `service/shot_service.go` — TriggerBreakdown / TriggerGenerateShot / IngestBreakdown / IngestShotAssets / TriggerProjectBreakdown（按章节入队）；自动带上所有 character 的 `ref_image_key` 作为 character_refs。
+- `service/services.go` — 接入 ShotService + EventBus。
+- `service/asset_service.go` — 早已提供 URL 便捷方法。
+- `infra/queue/events.go` + `ws.go` — `EventBus`：基于 `redis/go-redis` Pub/Sub，订阅 `events:project:*` 并 fan-out 到本地订阅者；`ServeWS(w,r,projectID)` 用 gorilla/websocket upgrade。
+- `infra/queue/asynq.go` — `NewAsynqClient` 同时返回 `*EventBus`（共享 Redis client）。
+- `httpapi/handlers.go` — `listShots / getShot / triggerBreakdown / ingestBreakdown / regenShotImage / regenShotTTS / ingestShotAssets`；列表/详情自动签名 URL；`wsProject` 真实升级。
+- `httpapi/router.go` — `/projects/{id}/shots:breakdown` + `:breakdown:ingest`；`/shots/{id}` GET + `/image:regen` + `/tts:regen` + `/assets:ingest`。
+- `cmd/api/main.go` + `cmd/cli/main.go` — 接 `EventBus`。
+- 单测：`shot_service_test.go` + `shot_test.go`。
+
+### frontend
+- `lib/api/client.ts` — Shot + endpoint schema。
+- `features/shot/api.ts` — useShots / useShot / useTriggerBreakdown / useIngestBreakdown / useRegenShotImage / useRegenShotTTS / useIngestShotAssets。
+- `features/shot/ShotList.tsx` — 按 `chapter#scene_idx` 分组的卡片流：缩略图 / 描述 / 旁白 / 配音播放器 / 重新生图/配音。
+- `pages/ShotListPage.tsx` — 容器 + 内嵌 WS pinger，WS 事件触发 list/character/chapter cache 失效（替换轮询占位）。
+- `lib/ws/projectSocket.ts` — 类型化为 `WsEvent`；指数退避 reconnect。
+
+### 待补（不在 M4）
+- BGM 仍是静音 WAV（M5 接 MusicGen/Suno）。
+- 真正按 chapter 维度的进度聚合（前端目前是泛 invalidation）。
+- WebSocket 鉴权（v0.1 暂按 IP/project_id）。

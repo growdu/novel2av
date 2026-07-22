@@ -31,12 +31,12 @@ log = logging.getLogger(__name__)
 def split_chapters(self, payload: dict) -> dict:
     parsed = SplitChaptersPayload.model_validate(payload)
     log.info("split_chapters start", extra={"project_id": parsed.project_id})
-    report_progress(self.request.id, "running", 0, 4, "fetching source")
+    report_progress(self.request.id, "running", 0, 4, "fetching source", project_id=parsed.project_id)
 
     text = _download_source(parsed.source_key)
     log.info("fetched source", extra={"bytes": len(text)})
 
-    report_progress(self.request.id, "running", 1, 4, "rule split")
+    report_progress(self.request.id, "running", 1, 4, "rule split", project_id=parsed.project_id)
     slices = rule_split(text)
     used_llm = False
     if len(slices) < 2:
@@ -50,7 +50,7 @@ def split_chapters(self, payload: dict) -> dict:
                 # Whole book becomes a single chapter so the user can fix by hand.
                 slices = [ChapterSlice(1, "第一章", 0, len(text))]
 
-    report_progress(self.request.id, "running", 2, 4, "uploading chapters")
+    report_progress(self.request.id, "running", 2, 4, "uploading chapters", project_id=parsed.project_id)
     for s in slices:
         chunk_key = f"projects/{parsed.project_id}/chapters/{s.index}.json"
         body = json.dumps({
@@ -63,7 +63,7 @@ def split_chapters(self, payload: dict) -> dict:
         }, ensure_ascii=False).encode("utf-8")
         _upload(chunk_key, body, "application/json")
 
-    report_progress(self.request.id, "running", 3, 4, "storing result")
+    report_progress(self.request.id, "running", 3, 4, "storing result", project_id=parsed.project_id)
     result_key = f"results/{parsed.project_id}/split_chapters.json"
     _upload(result_key, json.dumps({
         "chapters": [
@@ -75,7 +75,7 @@ def split_chapters(self, payload: dict) -> dict:
         "used_llm": used_llm,
     }, ensure_ascii=False).encode("utf-8"), "application/json")
 
-    report_progress(self.request.id, "success", 4, 4, "done")
+    report_progress(self.request.id, "success", 4, 4, "done", project_id=parsed.project_id)
     return {"status": "ok", "project_id": parsed.project_id,
             "chapter_count": len(slices), "used_llm": used_llm,
             "result_key": result_key}

@@ -322,15 +322,143 @@ func deleteCharacter(svcs *service.Services) http.HandlerFunc {
 
 // --- placeholders for the remaining surfaces ------------------------------
 
-func listShots(svcs *service.Services) http.HandlerFunc           { return notImpl }
-func regenShotImage(svcs *service.Services) http.HandlerFunc      { return notImpl }
-func regenShotTTS(svcs *service.Services) http.HandlerFunc        { return notImpl }
+func getShot(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		sh, err := svcs.Shot.Get(r.Context(), id)
+		if mapErr(w, err) { return }
+		ttl := 30 * time.Minute
+		if sh.ImageKey != "" {
+			if u, err := svcs.Asset.URL(r.Context(), sh.ImageKey, ttl); err == nil {
+				if sh.Meta == nil { sh.Meta = map[string]any{} }
+				sh.Meta["image_url"] = u
+			}
+		}
+		if sh.TTSKey != "" {
+			if u, err := svcs.Asset.URL(r.Context(), sh.TTSKey, ttl); err == nil {
+				if sh.Meta == nil { sh.Meta = map[string]any{} }
+				sh.Meta["tts_url"] = u
+			}
+		}
+		if sh.BGMKey != "" {
+			if u, err := svcs.Asset.URL(r.Context(), sh.BGMKey, ttl); err == nil {
+				if sh.Meta == nil { sh.Meta = map[string]any{} }
+				sh.Meta["bgm_url"] = u
+			}
+		}
+		jsonResp(w, http.StatusOK, sh)
+	}
+}
+
+// --- Shots ------------------------------------------------------------------
+
+func listShots(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		items, err := svcs.Shot.ListByProject(r.Context(), projectID)
+		if mapErr(w, err) { return }
+		if items == nil {
+			items = []domain.Shot{}
+		}
+		// Decorate with signed URLs for any media we have.
+		ttl := 30 * time.Minute
+		for i := range items {
+			if items[i].ImageKey != "" {
+				if u, err := svcs.Asset.URL(r.Context(), items[i].ImageKey, ttl); err == nil {
+					if items[i].Meta == nil { items[i].Meta = map[string]any{} }
+					items[i].Meta["image_url"] = u
+				}
+			}
+			if items[i].TTSKey != "" {
+				if u, err := svcs.Asset.URL(r.Context(), items[i].TTSKey, ttl); err == nil {
+					if items[i].Meta == nil { items[i].Meta = map[string]any{} }
+					items[i].Meta["tts_url"] = u
+				}
+			}
+			if items[i].BGMKey != "" {
+				if u, err := svcs.Asset.URL(r.Context(), items[i].BGMKey, ttl); err == nil {
+					if items[i].Meta == nil { items[i].Meta = map[string]any{} }
+					items[i].Meta["bgm_url"] = u
+				}
+			}
+		}
+		jsonResp(w, http.StatusOK, items)
+	}
+}
+
+func triggerBreakdown(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		jobIDs, err := svcs.Shot.TriggerProjectBreakdown(r.Context(), projectID)
+		if mapErr(w, err) { return }
+		jsonResp(w, http.StatusAccepted, map[string]any{"job_ids": jobIDs, "status": "queued"})
+	}
+}
+
+func ingestBreakdown(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		var body struct {
+			ChapterID string `json:"chapter_id"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.ChapterID == "" {
+			errResp(w, http.StatusBadRequest, "invalid_input", "chapter_id required")
+			return
+		}
+		n, err := svcs.Shot.IngestBreakdown(r.Context(), projectID, body.ChapterID)
+		if mapErr(w, err) { return }
+		jsonResp(w, http.StatusOK, map[string]any{"ingested": n})
+	}
+}
+
+func regenShotImage(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body struct{ Aspect string `json:"aspect"` }
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		jobID, err := svcs.Shot.TriggerGenerateShot(r.Context(), id, body.Aspect)
+		if mapErr(w, err) { return }
+		jsonResp(w, http.StatusAccepted, map[string]any{"job_id": jobID, "status": "queued"})
+	}
+}
+
+func regenShotTTS(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		jobID, err := svcs.Shot.TriggerGenerateShot(r.Context(), id, "")
+		if mapErr(w, err) { return }
+		jsonResp(w, http.StatusAccepted, map[string]any{"job_id": jobID, "status": "queued"})
+	}
+}
+
+func ingestShotAssets(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := chi.URLParam(r, "id")
+		var body struct {
+			ImageKey    *string `json:"image_key,omitempty"`
+			TTSKey      *string `json:"tts_key,omitempty"`
+			BGMKey      *string `json:"bgm_key,omitempty"`
+			SubtitleKey *string `json:"subtitle_key,omitempty"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			errResp(w, http.StatusBadRequest, "invalid_input", err.Error()); return
+		}
+		sh, err := svcs.Shot.IngestShotAssets(r.Context(), id, service.ShotAssetPatch{
+			ImageKey: body.ImageKey, TTSKey: body.TTSKey, BGMKey: body.BGMKey, SubtitleKey: body.SubtitleKey,
+		})
+		if mapErr(w, err) { return }
+		jsonResp(w, http.StatusOK, sh)
+	}
+}
+
 func composeChapterVideo(svcs *service.Services) http.HandlerFunc { return notImpl }
 func getJob(svcs *service.Services) http.HandlerFunc               { return notImpl }
 func getAsset(svcs *service.Services) http.HandlerFunc             { return notImpl }
 func wsProject(svcs *service.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		errResp(w, http.StatusNotImplemented, "not_implemented", "websocket handler pending")
+		projectID := chi.URLParam(r, "id")
+		svcs.Events.ServeWS(w, r, projectID)
 	}
 }
 
