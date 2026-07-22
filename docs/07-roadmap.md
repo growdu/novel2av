@@ -223,3 +223,33 @@ Infra
 - BGM 仍是静音 WAV（M5 接 MusicGen/Suno）。
 - 真正按 chapter 维度的进度聚合（前端目前是泛 invalidation）。
 - WebSocket 鉴权（v0.1 暂按 IP/project_id）。
+
+## M5 增量 — BGM + 字幕 + 章节合成（已落地）
+
+### ai-engine
+- `infra/media/bgm_provider.py` — `generate_bgm`；默认返回基于 mood 生成的柔和 pad WAV（确定性，便于预览），env `AI_BGM_ENDPOINT` 指向 MusicGen/Suno 时走外部。
+- `infra/media/subtitle_provider.py` — `cues_from_shots`（按 narration+duration 累积成 cue）、`render_srt`、`render_ass`（带样式头部，方便 ffmpeg burn-in）。
+- `tasks/generate_shot.py` — 同时生成 image/tts/bgm/srt 四件套，全部上传到 `shots/<pid>/<cid>/<sid>/{image,tts,bgm,subtitle}` + `summary.json`。
+- `tasks/compose_chapter.py` — 读 `results/<id>/chapters/<cid>/shots.json` → 下载资产到 tmp → 渲染 srt+ass → ffmpeg 单次 filter_complex（每镜 image 循环到 tts 时长；bgm ducked 25%；tts 全量；最后 concat + ass burn-in + h264/aac + faststart）→ 上传 `videos/<id>/<cid>.{mp4,srt,ass}`。
+
+### backend
+- `migrations/0003_chapter_videos.sql` — 新表 `chapter_videos(chapter_id pk, video_key, duration_sec, status, error, ...)`。
+- `infra/db/repo/chapter_video.go` — Upsert / Get / ListByProject（按 chapter.index 排序）。
+- `service/composition_service.go` — TriggerCompose（先把 per-shot manifest 推到 MinIO 让 ai-engine 看到 key，再入队 `ai:compose_chapter`）、TriggerProjectCompose（按章节遍历入队）、IngestComposeResult（写回 chapter_videos，READY 时推进项目状态到 RUNNING，并 publish `chapter.ready` WS 事件）。
+- `service/services.go` — 接 CompositionService。
+- `httpapi/handlers.go` — `composeChapterVideo / composeAllChapters / getChapterVideo / listChapterVideos / ingestChapterVideo`；`getChapterVideo` 自动签名 URL。
+- `httpapi/router.go` — `/chapters/{id}/video` GET；`/chapters/{id}/video:compose` POST；`/chapters/{id}/video:ingest` POST；`/projects/{id}/videos` GET；`/projects/{id}/videos/compose` POST。
+- `service/composition_service_test.go` — 缺失章节映射错误。
+
+### frontend
+- `lib/api/client.ts` — ChapterVideo + 5 个新 endpoint schema。
+- `features/composition/api.ts` — useChapterVideo / useProjectVideos / useComposeChapter / useComposeProject / useIngestChapterVideo。
+- `pages/VideoPreviewPage.tsx` — `ChapterVideoPlayer`（合成按钮 + 状态徽标 + 内嵌 `<video>`）。
+- `pages/ChapterEditorPage.tsx` — 右侧追加成片预览块（chapterId 直接传入 player）。
+- `pages/ProjectDetailPage.tsx` —「一键合成全部章节」按钮 + 成片导航链接。
+- `pages/ProjectVideosPage.tsx` — 项目维度成片列表（点章节跳到编辑器播放）。
+- `app/router.tsx` — `/projects/:id/videos` 路由。
+
+### 待补（不在 M5）
+- 全本 concat（M6）。
+- WebSocket 接到成片状态（player 现在靠 useChapterVideo 的 invalidate；M6 集中做 WS 驱动的统一进度条）。

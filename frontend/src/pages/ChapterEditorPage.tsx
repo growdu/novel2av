@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChapterListPanel } from '../features/chapter/ChapterListPanel';
 import { useChapters, useMergeChaptersLocally, usePatchChapter } from '../features/chapter/api';
+import { ChapterVideoPlayer } from './VideoPreviewPage';
 
 export function ChapterEditorPage() {
   const { id, n } = useParams();
@@ -54,19 +55,14 @@ export function ChapterEditorPage() {
               onClick={() => merge.mutate({ projectId: id, from: mergeFrom, to: mergeTo, keepTitle: title })}
               disabled={merge.isPending || mergeFrom >= mergeTo}
               className="px-3 py-1.5 rounded bg-slate-900 text-white disabled:opacity-50"
-            >
-              合并
-            </button>
+            >合并</button>
           </div>
           {merge.error && <p className="text-sm text-red-600">{(merge.error as Error).message}</p>}
         </div>
 
-        <div className="border rounded bg-slate-50 p-4 text-sm text-slate-500">
-          <p>后续里程碑：</p>
-          <ul className="list-disc ml-6 mt-1">
-            <li>M4：分镜卡片 + 配音预览</li>
-            <li>M5：章节合成 + 成片预览</li>
-          </ul>
+        <div className="border rounded bg-white p-4">
+          <h3 className="font-medium mb-2">成片预览</h3>
+          <ChapterVideoPlayer chapterId={ch.id} projectId={id} aspect="9:16" />
         </div>
       </section>
     </div>

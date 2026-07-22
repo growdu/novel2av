@@ -33,6 +33,16 @@ export interface Shot {
   created_at: string;
 }
 
+export interface ChapterVideo {
+  chapter_id: string;
+  video_key: string;
+  duration_sec: number;
+  status: string;
+  error: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ListResponse<T> { items: T[]; limit: number; offset: number; }
 
 export const api = openapiFetch<{
@@ -91,6 +101,30 @@ export const api = openapiFetch<{
     POST: {
       requestBody?: { content?: { 'application/json': { image_key?: string; tts_key?: string; bgm_key?: string; subtitle_key?: string } } };
       responses: { 200: Shot };
+    };
+  };
+  '/chapters/{id}/video': {
+    GET: { responses: { 200: { chapter_id: string; video_url?: string; duration_sec: number; status: string; error: string } } };
+  };
+  '/chapters/{id}/video:compose': {
+    POST: {
+      requestBody?: { content?: { 'application/json': { aspect?: string } } };
+      responses: { 202: { job_id: string; status: string } };
+    };
+  };
+  '/chapters/{id}/video:ingest': {
+    POST: {
+      requestBody?: { content?: { 'application/json': { video_key: string; duration_sec: number; status?: string; error?: string } } };
+      responses: { 204: unknown };
+    };
+  };
+  '/projects/{id}/videos': {
+    GET: { responses: { 200: ChapterVideo[] } };
+  };
+  '/projects/{id}/videos/compose': {
+    POST: {
+      requestBody?: { content?: { 'application/json': { aspect?: string } } };
+      responses: { 202: { job_ids: string[]; status: string } };
     };
   };
 }>({ baseUrl: '/api/v1' });

@@ -7,6 +7,7 @@ import { CharacterGalleryPage } from '../pages/CharacterGalleryPage';
 import { CharacterDetailPage } from '../pages/CharacterDetailPage';
 import { ShotListPage } from '../pages/ShotListPage';
 import { VideoPreviewPage } from '../pages/VideoPreviewPage';
+import { ProjectVideosPage } from '../pages/ProjectVideosPage';
 import { SettingsPage } from '../pages/SettingsPage';
 
 export const router = createBrowserRouter([
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: 'projects/:id/characters/:cid', element: <CharacterDetailPage /> },
       { path: 'projects/:id/shots', element: <ShotListPage /> },
       { path: 'projects/:id/preview/:chapter', element: <VideoPreviewPage /> },
+      { path: 'projects/:id/videos', element: <ProjectVideosPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
   },
