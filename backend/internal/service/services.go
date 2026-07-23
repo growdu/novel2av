@@ -10,33 +10,35 @@ import (
 )
 
 type Services struct {
-	DB          *pgxpool.Pool
-	Storage     *storage.MinIOClient
-	Queue       *queue.AsynqClient
-	Events      *queue.EventBus
-	Pipeline    *PipelineService
-	Asset       *AssetService
-	Project     *ProjectService
-	Chapter     *ChapterService
-	Character   *CharacterService
-	Shot        *ShotService
-	Composition *CompositionService
+	DB           *pgxpool.Pool
+	Storage      *storage.MinIOClient
+	Queue        *queue.AsynqClient
+	Events       *queue.EventBus
+	Pipeline     *PipelineService
+	Asset        *AssetService
+	Project      *ProjectService
+	Chapter      *ChapterService
+	Character    *CharacterService
+	Shot         *ShotService
+	Composition  *CompositionService
+	ProjectVideo *ProjectVideoService
 }
 
 func New(db *pgxpool.Pool, st *storage.MinIOClient, q *queue.AsynqClient, eb *queue.EventBus) *Services {
 	hub := newEventHub()
 	return &Services{
-		DB:          db,
-		Storage:     st,
-		Queue:       q,
-		Events:      eb,
-		Pipeline:    NewPipelineService(db, q, hub),
-		Asset:       NewAssetService(st),
-		Project:     NewProjectService(db, st),
-		Chapter:     NewChapterService(db, st, q),
-		Character:   NewCharacterService(db, st, q),
-		Shot:        NewShotService(db, st, q),
-		Composition: NewCompositionService(db, st, q, eb),
+		DB:           db,
+		Storage:      st,
+		Queue:        q,
+		Events:       eb,
+		Pipeline:     NewPipelineService(db, q, hub),
+		Asset:        NewAssetService(st),
+		Project:      NewProjectService(db, st),
+		Chapter:      NewChapterService(db, st, q),
+		Character:    NewCharacterService(db, st, q),
+		Shot:         NewShotService(db, st, q),
+		Composition:  NewCompositionService(db, st, q, eb),
+		ProjectVideo: NewProjectVideoService(db, st, q, eb),
 	}
 }
 

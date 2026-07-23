@@ -253,3 +253,26 @@ Infra
 ### 待补（不在 M5）
 - 全本 concat（M6）。
 - WebSocket 接到成片状态（player 现在靠 useChapterVideo 的 invalidate；M6 集中做 WS 驱动的统一进度条）。
+
+## M6 增量 — 全本合并（已落地）
+
+### ai-engine
+- `tasks/compose_full.py` — 下载所有 chapter.mp4 → 为每章渲染 1.5s 标题卡（`ffmpeg` drawtext，缺字体自动 fallback 到纯色卡）→ 用 concat demuxer 拼接（章节参数与 M5 一致所以走 `-c copy`；不匹配时 fallback 重编）→ 上传 `videos/<id>/full.mp4`。Manifest `results/<id>/full.json` 与 `project.json` 由 backend 提前推到 MinIO。
+
+### backend
+- `migrations/0004_project_videos.sql` — `project_videos(project_id pk, video_key, duration_sec, status, error, ...)`。
+- `infra/db/repo/project_video.go` — Upsert / Get。
+- `service/project_video_service.go` — `TriggerCompose`（聚合 chapter_videos + project config → 上传 full.json/project.json → 入队 `ai:compose_full`） / `IngestComposeResult`（READY 时把项目状态推到 `DONE` 并 publish `project.ready` WS 事件）。
+- `service/services.go` — 接 ProjectVideoService。
+- `httpapi/handlers.go` — `getProjectVideo / composeProjectVideo / ingestProjectVideo`（自动签名 URL）。
+- `httpapi/router.go` — `/projects/{id}/full` GET + `/full/compose` POST + `/full/ingest` POST。
+
+### frontend
+- `lib/api/client.ts` — `ProjectVideoSigned` + 3 个 endpoint schema。
+- `features/project_video/api.ts` — useProjectVideo / useComposeProjectVideo / useIngestProjectVideo。
+- `features/project_video/FullVideoPanel.tsx` — 状态徽标 + 内嵌 `<video>` + 下载链接 + 重新合成按钮。
+- `pages/ProjectDetailPage.tsx` — 顶部步骤把 M6 标绿；新增 FullVideoPanel。
+
+### 待补（不在 M6）
+- M5/M6 的 `compose_full` 与 `compose_chapter` 都没接 ai-engine 的「自动回调 backend」（仍由 ai-engine 任务 return dict + 后端 CLI 手动 ingest；M7 接正式的内部 callback）。
+- WebSocket 推到前端时，目前仅 invalidate project-video cache；UI 仍未显示「正在合成第 N 章 / 总 M 章」的进度条（M8）。

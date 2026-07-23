@@ -321,6 +321,55 @@ func deleteCharacter(svcs *service.Services) http.HandlerFunc {
 	}
 }
 
+// --- Project video (full book) --------------------------------------------
+
+func getProjectVideo(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		v, err := svcs.ProjectVideo.Get(r.Context(), projectID)
+		if mapErr(w, err) { return }
+		if v.VideoKey != "" {
+			if u, err := svcs.Asset.URL(r.Context(), v.VideoKey, 60*time.Minute); err == nil {
+				jsonResp(w, http.StatusOK, map[string]any{
+					"project_id": v.ProjectID, "video_url": u,
+					"duration_sec": v.DurationSec, "status": v.Status, "error": v.Error,
+				})
+				return
+			}
+		}
+		jsonResp(w, http.StatusOK, v)
+	}
+}
+
+func composeProjectVideo(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		jobID, err := svcs.ProjectVideo.TriggerCompose(r.Context(), projectID)
+		if mapErr(w, err) { return }
+		jsonResp(w, http.StatusAccepted, map[string]any{"job_id": jobID, "status": "queued"})
+	}
+}
+
+func ingestProjectVideo(svcs *service.Services) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "id")
+		var body struct {
+			VideoKey    string  `json:"video_key"`
+			DurationSec float64 `json:"duration_sec"`
+			Status      string  `json:"status"`
+			Error       string  `json:"error"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			errResp(w, http.StatusBadRequest, "invalid_input", err.Error()); return
+		}
+		if body.Status == "" { body.Status = "READY" }
+		if _, err := svcs.ProjectVideo.IngestComposeResult(r.Context(), projectID, body.VideoKey, body.DurationSec, body.Status, body.Error); err != nil {
+			mapErr(w, err); return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // --- placeholders for the remaining surfaces ------------------------------
 
 func getShot(svcs *service.Services) http.HandlerFunc {

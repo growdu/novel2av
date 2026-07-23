@@ -54,6 +54,11 @@ func NewRouter(svcs *service.Services) http.Handler {
 			r.Get("/", listChapterVideos(svcs))
 			r.Post("/compose", composeAllChapters(svcs))
 		})
+		r.Route("/projects/{id}/full", func(r chi.Router) {
+			r.Get("/", getProjectVideo(svcs))
+			r.Post("/compose", composeProjectVideo(svcs))
+			r.Post("/ingest", ingestProjectVideo(svcs))
+		})
 		r.Route("/characters/{id}", func(r chi.Router) {
 			r.Get("/", getCharacter(svcs))
 			r.Patch("/", patchCharacter(svcs))
