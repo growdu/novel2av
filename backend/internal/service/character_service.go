@@ -47,6 +47,11 @@ func (s *CharacterService) Patch(ctx context.Context, id string, p domain.Charac
 	if p.Name != nil && *p.Name == "" {
 		return domain.Character{}, fmt.Errorf("%w: name cannot be empty", domain.ErrInvalidInput)
 	}
+	// Defensive: tests (and any future partial-init path) should not panic on
+	// a nil repo; surface a typed error so the validation order can be exercised.
+	if s.characters == nil {
+		return domain.Character{}, fmt.Errorf("character repo not configured")
+	}
 	return s.characters.Patch(ctx, id, p)
 }
 

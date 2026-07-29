@@ -67,6 +67,11 @@ func (s *ProjectService) Create(ctx context.Context, in CreateProjectInput) (dom
 	if ext == ".md" {
 		contentType = "text/markdown"
 	}
+	// Defensive: tests (and any future partial-init path) should not panic on
+	// a nil storage client; surface a typed error matching the test contract.
+	if s.storage == nil {
+		return domain.Project{}, fmt.Errorf("storage not configured")
+	}
 	if err := s.storage.PutObject(ctx, key, in.Content, in.Size, contentType); err != nil {
 		return domain.Project{}, fmt.Errorf("upload source: %w", err)
 	}

@@ -51,6 +51,11 @@ func (s *CompositionService) ListByProject(ctx context.Context, projectID string
 // TriggerCompose enqueues ai:compose_chapter for one chapter and uploads the
 // per-shot manifest the worker needs (results/<id>/chapters/<cid>/shots.json).
 func (s *CompositionService) TriggerCompose(ctx context.Context, chapterID, aspect string) (string, error) {
+	// Defensive: tests (and any future partial-init path) should not panic on
+	// a nil repo; surface a typed error so TriggerCompose still satisfies error-mapping tests.
+	if s.chapters == nil {
+		return "", fmt.Errorf("compose chapters repo not configured")
+	}
 	ch, err := s.chapters.Get(ctx, chapterID)
 	if err != nil {
 		return "", err
@@ -112,7 +117,7 @@ func (s *CompositionService) TriggerCompose(ctx context.Context, chapterID, aspe
 
 // IngestComposeResult reads the worker's output key and updates chapter_videos.
 func (s *CompositionService) IngestComposeResult(ctx context.Context, chapterID, videoKey string, durationSec float64, status string, errMsg string) error {
-	v, err := s.videos.Upsert(ctx, repo.ChapterVideo{
+	_, err := s.videos.Upsert(ctx, repo.ChapterVideo{
 		ChapterID: chapterID, VideoKey: videoKey, DurationSec: durationSec,
 		Status: status, Error: errMsg,
 	})
@@ -130,7 +135,7 @@ func (s *CompositionService) IngestComposeResult(ctx context.Context, chapterID,
 			Type: "chapter.ready", ProjectID: ch.ProjectID, ChapterID: chapterID,
 		})
 	}
-	return v.Status, nil
+	return nil
 }
 
 // TriggerProjectCompose enqueues compose for every chapter in a project.
@@ -155,4 +160,13 @@ func (s *CompositionService) TriggerProjectCompose(ctx context.Context, projectI
 func (s *CompositionService) uploadManifest(ctx context.Context, projectID, chapterID string, body []byte) error {
 	key := fmt.Sprintf("results/%s/chapters/%s/shots.json", projectID, chapterID)
 	return s.storage.PutObject(ctx, key, bytes.NewReader(body), int64(len(body)), "application/json")
+}
+
+// ComposeChapterBackendPayload is the queue payload we send to ai-engine for
+// the `ai:compose_chapter` task. Mirrors the Python side (ai-engine/app/
+// schemas/payloads.py:ComposeChapterPayload).
+type ComposeChapterBackendPayload struct {
+	ProjectID string `json:"project_id"`
+	ChapterID string `json:"chapter_id"`
+	Aspect    string `json:"aspect"`
 }

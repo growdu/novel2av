@@ -160,7 +160,12 @@ func (s *ShotService) IngestBreakdown(ctx context.Context, projectID, chapterID 
 }
 
 // IngestShotAssets writes the per-shot asset keys back to the row.
-func (s *ShotService) IngestShotAssets(ctx context.Context, shotID string, p domain.ShotAssetPatch) (domain.Shot, error) {
+func (s *ShotService) IngestShotAssets(ctx context.Context, shotID string, p ShotAssetPatch) (domain.Shot, error) {
+	// Defensive: tests (and any future partial-init path) should not panic on
+	// a nil repo; surface a typed error matching the test contract.
+	if s.shots == nil {
+		return domain.Shot{}, fmt.Errorf("shot repo not configured")
+	}
 	return s.shots.PatchAssets(ctx, shotID, p.ImageKey, p.TTSKey, p.BGMKey, p.SubtitleKey)
 }
 

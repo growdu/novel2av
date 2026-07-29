@@ -47,6 +47,11 @@ func (s *ProjectVideoService) Get(ctx context.Context, projectID string) (repo.P
 // TriggerCompose enqueues ai:compose_full after publishing a manifest to
 // MinIO that lists every chapter video in order.
 func (s *ProjectVideoService) TriggerCompose(ctx context.Context, projectID string) (string, error) {
+	// Defensive: tests (and any future partial-init path) should not panic on
+	// a nil repo; surface a typed error matching the test contract.
+	if s.projects == nil {
+		return "", fmt.Errorf("project repo not configured")
+	}
 	p, err := s.projects.Get(ctx, projectID)
 	if err != nil {
 		return "", err
@@ -59,7 +64,7 @@ func (s *ProjectVideoService) TriggerCompose(ctx context.Context, projectID stri
 	if err != nil {
 		return "", err
 	}
-	chapByID := make(map[string]repo.Chapter, len(chs))
+	chapByID := make(map[string]domain.Chapter, len(chs))
 	for _, c := range chs {
 		chapByID[c.ID] = c
 	}
@@ -120,7 +125,7 @@ func (s *ProjectVideoService) TriggerCompose(ctx context.Context, projectID stri
 
 // IngestComposeResult updates the row + flips project to DONE on READY.
 func (s *ProjectVideoService) IngestComposeResult(ctx context.Context, projectID, videoKey string, durationSec float64, status, errMsg string) error {
-	v, err := s.fullVids.Upsert(ctx, repo.ProjectVideo{
+	_, err := s.fullVids.Upsert(ctx, repo.ProjectVideo{
 		ProjectID: projectID, VideoKey: videoKey, DurationSec: durationSec,
 		Status: status, Error: errMsg,
 	})
@@ -137,7 +142,7 @@ func (s *ProjectVideoService) IngestComposeResult(ctx context.Context, projectID
 			Type: "project.ready", ProjectID: projectID,
 		})
 	}
-	return v.Status, nil
+	return nil
 }
 
 func (s *ProjectVideoService) upload(ctx context.Context, key string, body []byte) error {

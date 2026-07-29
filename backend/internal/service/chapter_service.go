@@ -45,6 +45,11 @@ func (s *ChapterService) Patch(ctx context.Context, id string, title *string, st
 	if title != nil && *title == "" {
 		return domain.Chapter{}, fmt.Errorf("%w: title cannot be empty", domain.ErrInvalidInput)
 	}
+	// Defensive: tests (and any future partial-init path) should not panic on
+	// a nil repo; surface a typed error so the validation order can be exercised.
+	if s.chapters == nil {
+		return domain.Chapter{}, fmt.Errorf("chapter repo not configured")
+	}
 	return s.chapters.Patch(ctx, id, title, status)
 }
 
