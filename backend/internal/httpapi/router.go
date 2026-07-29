@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/novel2av/backend/internal/infra/observability"
 	"github.com/novel2av/backend/internal/service"
 )
 
@@ -23,6 +24,7 @@ func NewRouter(svcs *service.Services) http.Handler {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 	r.Get("/readyz", readyz(svcs))
+	r.Method("GET", observability.MetricsPath, metricsHandler())
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/projects", func(r chi.Router) {
@@ -78,4 +80,15 @@ func NewRouter(svcs *service.Services) http.Handler {
 		r.Get("/ws/projects/{id}", wsProject(svcs))
 	})
 	return r
+}
+
+// metricsHandler exposes the Prometheus /metrics endpoint. The handler is
+// installed once by SetupMetrics; here we just look it up via the package-
+// level Registry. /metrics is intentionally on the main listener so dev
+// `curl` works; production deployments should restrict it at the reverse
+// proxy (nginx) to a private network.
+func metricsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		observability.SetupMetrics().ServeHTTP(w, r)
+	}
 }
