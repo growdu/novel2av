@@ -121,16 +121,4 @@ func scanShot(s scanner) (domain.Shot, error) {
 // jsonUnmarshal delegates to encoding/json (kept as a hook for tests).
 var jsonUnmarshal = json.Unmarshal
 
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [20]byte
-	pos := len(b)
-	for n > 0 {
-		pos--
-		b[pos] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[pos:])
-}
+// itoa is defined in chapter.go (same package).

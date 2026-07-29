@@ -21,7 +21,7 @@ func fetchURL(ctx context.Context, url string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
-		return nil, fmtErr(resp.Status)
+		return nil, fmtErr(resp.StatusCode)
 	}
 	return io.ReadAll(resp.Body)
 }

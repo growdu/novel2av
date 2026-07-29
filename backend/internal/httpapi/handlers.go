@@ -214,7 +214,7 @@ func listCharacters(svcs *service.Services) http.HandlerFunc {
 			}
 			u, err := svcs.Asset.URL(r.Context(), items[i].RefImageKey, ttl)
 			if err == nil {
-				items[i].Meta = map[string]any{"ref_image_url": u.String()}
+				items[i].Meta = map[string]any{"ref_image_url": u}
 			}
 		}
 		jsonResp(w, http.StatusOK, items)
@@ -252,7 +252,7 @@ func getCharacter(svcs *service.Services) http.HandlerFunc {
 		}
 		if c.RefImageKey != "" {
 			if u, err := svcs.Asset.URL(r.Context(), c.RefImageKey, 30*time.Minute); err == nil {
-				c.Meta = map[string]any{"ref_image_url": u.String()}
+				c.Meta = map[string]any{"ref_image_url": u}
 			}
 		}
 		jsonResp(w, http.StatusOK, c)
@@ -363,7 +363,7 @@ func ingestProjectVideo(svcs *service.Services) http.HandlerFunc {
 			errResp(w, http.StatusBadRequest, "invalid_input", err.Error()); return
 		}
 		if body.Status == "" { body.Status = "READY" }
-		if _, err := svcs.ProjectVideo.IngestComposeResult(r.Context(), projectID, body.VideoKey, body.DurationSec, body.Status, body.Error); err != nil {
+		if err := svcs.ProjectVideo.IngestComposeResult(r.Context(), projectID, body.VideoKey, body.DurationSec, body.Status, body.Error); err != nil {
 			mapErr(w, err); return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -575,7 +575,7 @@ func ingestChapterVideo(svcs *service.Services) http.HandlerFunc {
 			errResp(w, http.StatusBadRequest, "invalid_input", err.Error()); return
 		}
 		if body.Status == "" { body.Status = "READY" }
-		if _, err := svcs.Composition.IngestComposeResult(r.Context(), chapterID, body.VideoKey, body.DurationSec, body.Status, body.Error); err != nil {
+		if err := svcs.Composition.IngestComposeResult(r.Context(), chapterID, body.VideoKey, body.DurationSec, body.Status, body.Error); err != nil {
 			mapErr(w, err); return
 		}
 		w.WriteHeader(http.StatusNoContent)

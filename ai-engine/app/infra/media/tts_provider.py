@@ -28,17 +28,32 @@ async def synthesize_speech(
     voice_id: str | None = None,
     speed: float = 1.0,
 ) -> tuple[bytes, str]:
-    """Return (wav_bytes, provider). Falls back to silence on error."""
+    """Return (wav_bytes, provider). Falls back to silence after exhausting chain."""
+    if not text.strip():
+        return silence_wav(""), provider or "default"
     s = get_settings()
-    p = provider or s.default_tts_provider
-    cfg = s.tts_providers.get(p, {})
+    preferred = provider or s.default_tts_provider
+    chain = [preferred] + [p for p in provider_router.tts_chain() if p != preferred]
+    for name in chain:
+        try:
+            wav = await _call_tts(name, text, voice_id=voice_id, speed=speed)
+            provider_router.record_provider_success(name)
+            return wav, name
+        except Exception as exc:
+            provider_router.record_provider_failure(name)
+            log.warning("tts provider failed; trying next",
+                        extra={"provider": name, "err": str(exc)})
+    log.warning("all tts providers failed; returning silence")
+    return silence_wav(text), preferred
+
+
+async def _call_tts(name: str, text: str, *, voice_id: str | None, speed: float) -> bytes:
+    s = get_settings()
+    cfg = s.tts_providers.get(name, {})
     base_url = cfg.get("base_url", "").rstrip("/")
     api_key = cfg.get("api_key") or os.environ.get("AI_TTS_API_KEY") or ""
-
-    if not base_url or not api_key or not text.strip():
-        log.warning("tts provider not configured; returning silence", extra={"provider": p})
-        return silence_wav(text), p
-
+    if not base_url or not api_key:
+        raise RuntimeError(f"tts provider {name} not configured")
     payload = {
         "model": cfg.get("default_model") or "doubao-tts",
         "input": text,
@@ -47,17 +62,13 @@ async def synthesize_speech(
         "response_format": "wav",
     }
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-    try:
-        async with httpx.AsyncClient(timeout=60) as cli:
-            r = await cli.post(f"{base_url}/audio/speech", json=payload, headers=headers)
-            if r.status_code >= 400:
-                log.warning("tts provider error; falling back to silence",
-                            extra={"status": r.status_code})
-                return silence_wav(text), p
-            return r.content, p
-    except Exception as exc:  # pragma: no cover
-        log.warning("tts call failed", extra={"err": str(exc)})
-        return silence_wav(text), p
+    async with httpx.AsyncClient(timeout=60) as cli:
+        r = await cli.post(f"{base_url}/audio/speech", json=payload, headers=headers)
+        if r.status_code >= 500:
+            raise RuntimeError(f"tts provider {name} returned {r.status_code}")
+        if r.status_code >= 400:
+            raise RuntimeError(f"tts provider {name} returned {r.status_code}")
+        return r.content
 
 
 def silence_wav(text: str, sample_rate: int = 22050) -> bytes:

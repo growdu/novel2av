@@ -13,7 +13,7 @@ func TestShotAssetPatch_NilFields_NoOp(t *testing.T) {
 	// Sanity: ensure the helper at least constructs and validation flows
 	// don't trip on nil pointers (DB path will fail, which is expected).
 	s := &ShotService{}
-	_, err := s.IngestShotAssets(context.Background(), "x", domain.ShotAssetPatch{})
+	_, err := s.IngestShotAssets(context.Background(), "x", ShotAssetPatch{})
 	require.Error(t, err)
 	require.NotErrorIs(t, err, domain.ErrInvalidInput)
 }

@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/novel2av/backend/internal/domain"
 )
 
 // Most composition paths require a live DB; here we just confirm the

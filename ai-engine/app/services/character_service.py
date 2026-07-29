@@ -48,7 +48,7 @@ async def extract_characters(
         system, user_tmpl = _FALLBACK_SYSTEM, _FALLBACK_USER
 
     user = user_tmpl.replace("{{text}}", sample)
-    res = await chat(provider, model, [
+    res = await chat_cached(provider, model, [
         ChatMessage("system", system),
         ChatMessage("user", user),
     ], response_format_json=True)

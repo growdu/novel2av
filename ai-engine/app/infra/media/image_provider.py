@@ -37,21 +37,40 @@ async def generate_image(
     height: int = 1024,
     reference_images: list[bytes] | None = None,
 ) -> GeneratedImage:
-    """Generate a single image for a character / scene.
-
-    The reference_images list (optional) is sent to providers that support
-    `image_reference` (e.g. Seedream); other providers ignore it.
-    """
+    """Generate a single image with health-aware fallback across the chain."""
     s = get_settings()
-    p = provider or s.default_image_provider
-    cfg = s.image_providers.get(p, {})
+    preferred = provider or s.default_image_provider
+    chain = [preferred] + [p for p in provider_router.image_chain() if p != preferred]
+    last_err: Exception | None = None
+    for name in chain:
+        try:
+            img = await _call_image(name, model, prompt, width, height, reference_images)
+            provider_router.record_provider_success(name)
+            return img
+        except Exception as exc:
+            provider_router.record_provider_failure(name)
+            last_err = exc
+            log.warning("image provider failed; trying next",
+                        extra={"provider": name, "err": str(exc)})
+    log.warning("all image providers failed; using placeholder",
+                extra={"err": str(last_err)})
+    return _placeholder(width, height, preferred)
+
+
+async def _call_image(
+    name: str,
+    model: str | None,
+    prompt: str,
+    width: int,
+    height: int,
+    reference_images: list[bytes] | None,
+) -> GeneratedImage:
+    s = get_settings()
+    cfg = s.image_providers.get(name, {})
     base_url = cfg.get("base_url", "").rstrip("/")
     api_key = cfg.get("api_key") or os.environ.get("AI_IMAGE_API_KEY") or ""
-
     if not base_url or not api_key:
-        log.warning("image provider not configured; using placeholder", extra={"provider": p})
-        return _placeholder(width, height, p)
-
+        raise RuntimeError(f"image provider {name} not configured")
     payload: dict = {
         "model": model or cfg.get("default_model") or "doubao-seedream-3-0-t2i-250415",
         "prompt": prompt,
@@ -60,19 +79,19 @@ async def generate_image(
     }
     if reference_images:
         payload["image"] = [base64.b64encode(b).decode("ascii") for b in reference_images]
-
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     async with httpx.AsyncClient(timeout=120) as cli:
         r = await cli.post(f"{base_url}/images/generations", json=payload, headers=headers)
+        if r.status_code >= 500:
+            raise RuntimeError(f"image provider {name} returned {r.status_code}")
         if r.status_code >= 400:
-            log.error("image provider error", extra={"status": r.status_code, "body": r.text[:500]})
-            return _placeholder(width, height, p)
+            raise RuntimeError(f"image provider {name} returned {r.status_code}")
         body = r.json()
         b64 = body["data"][0].get("b64_json")
         if not b64:
-            return _placeholder(width, height, p)
+            raise RuntimeError(f"image provider {name} returned no image")
         raw = base64.b64decode(b64)
-    return GeneratedImage(png_bytes=raw, width=width, height=height, provider=p,
+    return GeneratedImage(png_bytes=raw, width=width, height=height, provider=name,
                           model=payload["model"])
 
 

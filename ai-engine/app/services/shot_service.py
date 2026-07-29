@@ -91,7 +91,7 @@ async def scene_breakdown(
             .replace("{{text}}", text[:max_chars])
             .replace("{{characters}}", char_block))
 
-    res = await chat(provider, model, [
+    res = await chat_cached(provider, model, [
         ChatMessage("system", system),
         ChatMessage("user", user),
     ], response_format_json=True)

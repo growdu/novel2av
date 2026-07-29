@@ -50,6 +50,6 @@ func (s *PipelineService) EnqueueStep(ctx context.Context, p PipelineJobPayload)
 	if err != nil {
 		return "", err
 	}
-	_ = s.hub.Publish(ctx, p.ProjectID, Event{Type: "job.queued", JobID: id, Step: p.Step})
+	s.hub.Publish(ctx, p.ProjectID, Event{Type: "job.queued", JobID: id, Step: p.Step})
 	return id, nil
 }

@@ -92,7 +92,7 @@ async def llm_split(text: str, *, provider: str, model: str, sample_chars: int =
     sample = text[:sample_chars]
     user = user_tmpl.replace("{{text}}", sample)
 
-    res = await chat(provider, model, [
+    res = await chat_cached(provider, model, [
         ChatMessage("system", system),
         ChatMessage("user", user),
     ], response_format_json=True)
