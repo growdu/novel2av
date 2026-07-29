@@ -33,6 +33,10 @@ func main() {
 		slog.Error("load config", "err", err)
 		os.Exit(1)
 	}
+	if err := httpapi.EnsureInternalSecurity(cfg.AppEnv); err != nil {
+		slog.Error("internal security check", "err", err)
+		os.Exit(1)
+	}
 	observability.Setup(cfg.LogLevel)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

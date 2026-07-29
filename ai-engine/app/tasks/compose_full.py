@@ -22,6 +22,7 @@ from io import BytesIO
 from celery import shared_task
 
 from app.infra.queue.progress import report_progress
+from app.infra.queue.notify import notify_complete
 from app.infra.storage import get_client
 from app.schemas.payloads import ComposeFullPayload
 
@@ -72,7 +73,14 @@ def compose_full(self, payload: dict) -> dict:
             _upload(video_key, f.read(), "video/mp4")
 
     report_progress(self.request.id, "success", 4, 4, "done")
-    return {"status": "ok", "project_id": parsed.project_id, "video_key": video_key}
+    result = {"status": "ok", "project_id": parsed.project_id, "video_key": video_key}
+    notify_complete(self.request.id, {
+        "task": self.name,
+        "project_id": parsed.project_id,
+        "payload": payload,
+        "result": result,
+    })
+    return result
 
 
 # --- helpers ---------------------------------------------------------------
@@ -115,7 +123,6 @@ def fetch_project_title(project_id: str) -> str | None:
         return str(json.loads(data.decode("utf-8")).get("title", ""))
     except Exception:
         return None
-
 
 def _download_to(key: str, path: str) -> None:
     if not key:

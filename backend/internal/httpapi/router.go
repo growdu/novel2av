@@ -74,6 +74,7 @@ func NewRouter(svcs *service.Services) http.Handler {
 		})
 		r.Get("/jobs/{id}", getJob(svcs))
 		r.Get("/assets/{id}", getAsset(svcs))
+		r.Post("/internal/jobs/{id}:complete", internalJobComplete(svcs))
 		r.Get("/ws/projects/{id}", wsProject(svcs))
 	})
 	return r

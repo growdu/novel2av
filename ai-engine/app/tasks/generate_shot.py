@@ -18,6 +18,7 @@ from app.infra.media.image_provider import generate_image
 from app.infra.media.subtitle_provider import cues_from_shots, render_srt
 from app.infra.media.tts_provider import synthesize_speech, voice_for
 from app.infra.queue.progress import report_progress
+from app.infra.queue.notify import notify_complete
 from app.infra.storage import get_client
 from app.schemas.payloads import GenerateShotPayload
 
@@ -78,6 +79,12 @@ def generate_shot(self, payload: dict) -> dict:
 
     report_progress(self.request.id, "success", total, total, "done",
                     project_id=parsed.project_id)
+    notify_complete(self.request.id, {
+        "task": self.name,
+        "project_id": parsed.project_id,
+        "payload": payload,
+        "result": summary,
+    })
     return summary
 
 

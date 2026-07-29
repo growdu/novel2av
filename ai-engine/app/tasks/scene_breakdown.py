@@ -15,6 +15,7 @@ from io import BytesIO
 from celery import shared_task
 
 from app.infra.queue.progress import report_progress
+from app.infra.queue.notify import notify_complete
 from app.infra.storage import get_client
 from app.schemas.payloads import SceneBreakdownPayload
 from app.services.shot_service import scene_breakdown
@@ -57,8 +58,15 @@ def scene_breakdown_task(self, payload: dict) -> dict:
     _upload(key, json.dumps(body, ensure_ascii=False).encode("utf-8"))
 
     report_progress(self.request.id, "success", 3, 3, "done", project_id=parsed.project_id)
-    return {"status": "ok", "chapter_id": parsed.chapter_id,
-            "shot_count": len(shots), "result_key": key}
+    result = {"status": "ok", "chapter_id": parsed.chapter_id,
+              "shot_count": len(shots), "result_key": key}
+    notify_complete(self.request.id, {
+        "task": self.name,
+        "project_id": parsed.project_id,
+        "payload": payload,
+        "result": result,
+    })
+    return result
 
 
 # --- helpers ---------------------------------------------------------------

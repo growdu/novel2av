@@ -20,6 +20,7 @@ from io import BytesIO
 from celery import shared_task
 
 from app.infra.queue.progress import report_progress
+from app.infra.queue.notify import notify_complete
 from app.infra.storage import get_client
 from app.schemas.payloads import SplitChaptersPayload
 from app.services.chapter_service import ChapterSlice, llm_split, rule_split
@@ -76,9 +77,16 @@ def split_chapters(self, payload: dict) -> dict:
     }, ensure_ascii=False).encode("utf-8"), "application/json")
 
     report_progress(self.request.id, "success", 4, 4, "done", project_id=parsed.project_id)
-    return {"status": "ok", "project_id": parsed.project_id,
-            "chapter_count": len(slices), "used_llm": used_llm,
-            "result_key": result_key}
+    result = {"status": "ok", "project_id": parsed.project_id,
+              "chapter_count": len(slices), "used_llm": used_llm,
+              "result_key": result_key}
+    notify_complete(self.request.id, {
+        "task": self.name,
+        "project_id": parsed.project_id,
+        "payload": payload,
+        "result": result,
+    })
+    return result
 
 
 # --- helpers ---------------------------------------------------------------

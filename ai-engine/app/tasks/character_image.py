@@ -10,6 +10,7 @@ from celery import shared_task
 
 from app.infra.media.image_provider import generate_image
 from app.infra.queue.progress import report_progress
+from app.infra.queue.notify import notify_complete
 from app.infra.storage import get_client
 from app.schemas.payloads import CharacterImagePayload
 
@@ -44,9 +45,16 @@ def character_image(self, payload: dict) -> dict:
         _upload(ref_key, variants[0], "image/png")
 
     report_progress(self.request.id, "success", parsed.variants, parsed.variants, "done", project_id=parsed.project_id)
-    return {"status": "ok", "character_id": parsed.character_id,
-            "ref_image_key": f"characters/{parsed.project_id}/{parsed.character_id}/ref_image.png",
-            "variants": keys}
+    result = {"status": "ok", "character_id": parsed.character_id,
+              "ref_image_key": f"characters/{parsed.project_id}/{parsed.character_id}/ref_image.png",
+              "variants": keys}
+    notify_complete(self.request.id, {
+        "task": self.name,
+        "project_id": parsed.project_id,
+        "payload": payload,
+        "result": result,
+    })
+    return result
 
 
 # --- helpers ---------------------------------------------------------------

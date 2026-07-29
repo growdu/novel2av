@@ -14,6 +14,7 @@ from io import BytesIO
 from celery import shared_task
 
 from app.infra.queue.progress import report_progress
+from app.infra.queue.notify import notify_complete
 from app.infra.storage import get_client
 from app.schemas.payloads import ExtractCharactersPayload
 from app.services.character_service import CharacterProfile, extract_characters
@@ -46,8 +47,15 @@ def extract_characters_task(self, payload: dict) -> dict:
     _upload(result_key, json.dumps(manifest, ensure_ascii=False).encode("utf-8"))
 
     report_progress(self.request.id, "success", 4, 4, "done", project_id=parsed.project_id)
-    return {"status": "ok", "project_id": parsed.project_id,
-            "character_count": len(profiles), "result_key": result_key}
+    result = {"status": "ok", "project_id": parsed.project_id,
+              "character_count": len(profiles), "result_key": result_key}
+    notify_complete(self.request.id, {
+        "task": self.name,
+        "project_id": parsed.project_id,
+        "payload": payload,
+        "result": result,
+    })
+    return result
 
 
 # --- helpers ---------------------------------------------------------------

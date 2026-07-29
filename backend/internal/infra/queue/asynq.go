@@ -18,16 +18,14 @@ type AsynqClient struct {
 }
 
 func NewAsynqClient(aiURL, primaryURL string) (*AsynqClient, *EventBus, error) {
-	primary, err := asynq.NewClient(asynq.RedisClientOpt{Addr: addrOf(primaryURL), DB: dbOf(primaryURL)})
-	if err != nil {
-		return nil, nil, fmt.Errorf("primary asynq: %w", err)
-	}
-	ai, err := asynq.NewClient(asynq.RedisClientOpt{Addr: addrOf(aiURL), DB: dbOf(aiURL)})
-	if err != nil {
-		primary.Close()
-		return nil, nil, fmt.Errorf("ai asynq: %w", err)
-	}
+	primary := asynq.NewClient(asynq.RedisClientOpt{Addr: addrOf(primaryURL), DB: dbOf(primaryURL)})
+	ai := asynq.NewClient(asynq.RedisClientOpt{Addr: addrOf(aiURL), DB: dbOf(aiURL)})
 	rdb := redis.NewClient(&redis.Options{Addr: addrOf(primaryURL), DB: dbOf(primaryURL)})
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		primary.Close()
+		ai.Close()
+		return nil, nil, fmt.Errorf("redis ping: %w", err)
+	}
 	bus := NewEventBus(rdb)
 	return &AsynqClient{primary: primary, aiClient: ai, rdb: rdb}, bus, nil
 }
@@ -46,10 +44,26 @@ func (a *AsynqClient) Enqueue(_ context.Context, taskType string, payload []byte
 	return info.ID, nil
 }
 
-func (a *AsynqClient) Ping(_ context.Context) error { return a.primary.Ping() }
+func (a *AsynqClient) Ping(ctx context.Context) error { return a.rdb.Ping(ctx).Err() }
 
-func addrOf(_ string) string { return "localhost:6379" }
-func dbOf(_ string) int      { return 0 }
+// addrOf extracts the host:port portion of a redis URL via ParseRedisURL.
+// Falls back to localhost:6379 so a malformed URL never blocks startup in dev;
+// operators running two distinct Redis instances should see a clear error from
+// the redis ping below instead of a silent single-instance fallback.
+func addrOf(raw string) string {
+	addr, _, err := ParseRedisURL(raw)
+	if err != nil || addr == "" {
+		return "localhost:6379"
+	}
+	return addr
+}
+func dbOf(raw string) int {
+	_, db, err := ParseRedisURL(raw)
+	if err != nil {
+		return 0
+	}
+	return db
+}
 
 // ParseRedisURL is a small helper exported for future use (e.g. tests).
 func ParseRedisURL(s string) (addr string, db int, err error) {

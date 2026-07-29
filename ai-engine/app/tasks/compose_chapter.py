@@ -23,6 +23,7 @@ from celery import shared_task
 
 from app.infra.media.subtitle_provider import cues_from_shots, render_ass, render_srt
 from app.infra.queue.progress import report_progress
+from app.infra.queue.notify import notify_complete
 from app.infra.storage import get_client
 from app.schemas.payloads import ComposeChapterPayload
 
@@ -84,8 +85,15 @@ def compose_chapter(self, payload: dict) -> dict:
 
     duration = sum(c.end_sec - c.start_sec for c in cues)
     report_progress(self.request.id, "success", 4, 4, "done")
-    return {"status": "ok", "chapter_id": parsed.chapter_id,
-            "video_key": video_key, "duration_sec": duration}
+    result = {"status": "ok", "chapter_id": parsed.chapter_id,
+              "video_key": video_key, "duration_sec": duration}
+    notify_complete(self.request.id, {
+        "task": self.name,
+        "project_id": parsed.project_id,
+        "payload": payload,
+        "result": result,
+    })
+    return result
 
 
 # --- helpers ---------------------------------------------------------------
@@ -136,7 +144,6 @@ def fetch_shots_meta(project_id: str, chapter_id: str) -> list[dict]:
         return list(body.get("shots", []))
     except Exception:
         return []
-
 
 def run_ffmpeg_concat(
     image_paths: list[str],
