@@ -17,6 +17,7 @@ func NewRouter(svcs *service.Services) http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(MetricsMiddleware)
 	r.Use(corsMiddleware)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {

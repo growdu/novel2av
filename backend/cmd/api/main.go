@@ -38,6 +38,9 @@ func main() {
 		os.Exit(1)
 	}
 	observability.Setup(cfg.LogLevel)
+	// Allocate the Prometheus registry up-front so /metrics is reachable
+	// from the first scrape. SetupMetrics is idempotent.
+	observability.SetupMetrics()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
