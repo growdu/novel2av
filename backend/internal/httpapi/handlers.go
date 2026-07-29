@@ -586,6 +586,10 @@ func getAsset(svcs *service.Services) http.HandlerFunc             { return notI
 func wsProject(svcs *service.Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		projectID := chi.URLParam(r, "id")
+		if service.WSConnectionsActive != nil {
+			service.WSConnectionsActive.Inc()
+			defer service.WSConnectionsActive.Dec()
+		}
 		svcs.Events.ServeWS(w, r, projectID)
 	}
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -46,8 +47,10 @@ func (s *Services) Ping(ctx context.Context) error {
 	if err := s.DB.Ping(ctx); err != nil {
 		return err
 	}
-	if err := s.Queue.Ping(ctx); err != nil {
-		return err
+	qstart := time.Now()
+	qerr := s.Queue.Ping(ctx)
+	if RedisPingDuration != nil {
+		RedisPingDuration.Observe(time.Since(qstart).Seconds())
 	}
-	return nil
+	return qerr
 }

@@ -51,5 +51,8 @@ func (s *PipelineService) EnqueueStep(ctx context.Context, p PipelineJobPayload)
 		return "", err
 	}
 	s.hub.Publish(ctx, p.ProjectID, Event{Type: "job.queued", JobID: id, Step: p.Step})
+	if PipelineJobsEnqueued != nil {
+		PipelineJobsEnqueued.WithLabelValues(p.Step).Inc()
+	}
 	return id, nil
 }
