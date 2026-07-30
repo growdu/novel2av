@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from celery import Celery
 
+from app.infra.metrics import install_celery_hooks
 from app.settings import get_settings
 
 settings = get_settings()
@@ -37,3 +38,10 @@ celery_app.conf.update(
     task_soft_time_limit=50 * 60,
     broker_connection_retry_on_startup=True,
 )
+
+
+# M8-A5: bind a Prometheus /metrics endpoint per worker process and hook
+# task lifecycle signals to the in-package counters + histogram. Callers
+# that re-import this module (pytest reloads, fork-safety shims) get
+# the same bind reused via the idempotent helpers.
+_detach_metrics_hooks = install_celery_hooks(celery_app)

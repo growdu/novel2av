@@ -20,6 +20,7 @@ dependencies = [
   "pillow>=10.4",
   "minio>=7.2",
   "pyyaml>=6.0",
+  "prometheus-client>=0.20",
 ]
 
 [project.optional-dependencies]
